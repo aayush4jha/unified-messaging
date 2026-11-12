@@ -334,6 +334,7 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     background: var(--bg);
@@ -344,6 +345,7 @@
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
   }
   ::selection {
     background: var(--accent-soft-2);
@@ -394,6 +396,33 @@
   }
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+/*
+ * Installed-app frame (viewport-fit=cover): the app draws edge to edge and pads
+ * itself away from the notch, status bar and rounded corners. The bottom inset
+ * (home indicator) is handled by whatever sits at the bottom: tab bar, composer.
+ */
+@utility app-frame {
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Touch devices: iOS zooms into inputs under 16px; unlayered so it wins over size utilities. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: 16px;
   }
 }
 

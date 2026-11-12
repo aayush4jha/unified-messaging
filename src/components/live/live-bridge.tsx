@@ -8,6 +8,8 @@ import { decide, showDesktopNotification } from "@/lib/notify";
 import { accountPatch, conversationPatch, diffById, diffContacts, diffConversationLabels, diffNotes } from "@/lib/live-diff";
 import type { Conversation } from "@/lib/types";
 import { useWorkspace, type WorkspaceState } from "@/store/workspace";
+import { Outbox } from "@/lib/outbox";
+import { PUSH_FLAG } from "../pwa/push";
 
 /**
  * Connects the workspace store to the live backend when the user is signed in:
@@ -58,6 +60,11 @@ export function LiveBridge() {
 
     const flushOnHide = () => document.visibilityState === "hidden" && void outbox.flush();
     document.addEventListener("visibilitychange", flushOnHide);
+    const onOnline = () => {
+      outbox.online();
+      void refresh(false);
+    };
+    window.addEventListener("online", onOnline);
 
     return () => {
       alive = false;
@@ -65,6 +72,7 @@ export function LiveBridge() {
       stopRealtime?.();
       unsub();
       document.removeEventListener("visibilitychange", flushOnHide);
+      window.removeEventListener("online", onOnline);
       void outbox.flush();
     };
   }, []);
@@ -107,7 +115,18 @@ function startRealtime(userId: string, refresh: () => void, navigate: (href: str
       const d = decide({ kind: n.kind }, { prefs, account: accounts.find((a) => a.id === n.account_id), conversation: conversations.find((c) => c.id === n.conversation_id) });
       if (d.deliver && d.interrupt) {
         toast(n.title, { description: n.body });
-        if (prefs.desktopNotifications) void showDesktopNotification(n.title, n.body, () => n.conversation_id && navigate(`/inbox?c=${n.conversation_id}`));
+        // Devices with push turned on get the system notification from the push service instead.
+        const pushHere = (() => {
+          try {
+            return localStorage.getItem(PUSH_FLAG) === "1";
+          } catch {
+            return false;
+          }
+        })();
+        if (prefs.desktopNotifications && document.visibilityState === "hidden" && !pushHere) {
+          const url = n.conversation_id ? `/inbox?c=${n.conversation_id}` : "/inbox";
+          void showDesktopNotification(n.title, n.body, { url, tag: n.conversation_id, onClick: () => navigate(url) });
+        }
       }
       soon();
     })
@@ -163,80 +182,6 @@ function mirror(state: WorkspaceState, prev: WorkspaceState, out: Outbox) {
  * latest body; collection upserts collapse by id. `ordered` requests (merges)
  * run before collection writes in each flush.
  */
-class Outbox {
-  private requests = new Map<string, { url: string; method: string; body: unknown; ordered: boolean }>();
-  private collections = new Map<string, { upserts: Map<string, unknown>; deletes: Set<string> }>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private flushing: Promise<void> | null = null;
-
-  pending() {
-    return this.requests.size > 0 || this.collections.size > 0 || !!this.flushing;
-  }
-
-  request(url: string, method: string, body: unknown, key = `${method} ${url}`, ordered = false) {
-    const existing = this.requests.get(key);
-    // PATCH bodies merge so two quick toggles on one conversation become one request.
-    const merged = existing && method === "PATCH" ? { ...(existing.body as object), ...(body as object) } : body;
-    this.requests.set(key, { url, method, body: merged, ordered });
-    this.schedule();
-  }
-
-  collection(name: string, diff: { upserts: { id: string }[]; deletes: string[] }) {
-    if (!diff.upserts.length && !diff.deletes.length) return;
-    const c = this.collections.get(name) ?? { upserts: new Map(), deletes: new Set() };
-    for (const u of diff.upserts) {
-      c.upserts.set(u.id, u);
-      c.deletes.delete(u.id);
-    }
-    for (const d of diff.deletes) {
-      c.upserts.delete(d);
-      c.deletes.add(d);
-    }
-    this.collections.set(name, c);
-    this.schedule();
-  }
-
-  private schedule() {
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => void this.flush(), 800);
-  }
-
-  async flush(): Promise<void> {
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null;
-    if (this.flushing) await this.flushing;
-    const requests = [...this.requests.values()];
-    const collections = [...this.collections.entries()];
-    this.requests.clear();
-    this.collections.clear();
-    if (!requests.length && !collections.length) return;
-
-    this.flushing = (async () => {
-      let failed = false;
-      const call = async (url: string, method: string, body: unknown) => {
-        const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body), keepalive: true }).catch(() => null);
-        if (!r?.ok) failed = true;
-      };
-      for (const r of requests.filter((x) => x.ordered)) await call(r.url, r.method, r.body);
-      await Promise.all([
-        ...requests.filter((x) => !x.ordered).map((r) => call(r.url, r.method, r.body)),
-        ...collections.map(([name, c]) => call(`/api/data/${name}`, "POST", { upserts: [...c.upserts.values()].map(stripNotesId(name)), deletes: [...c.deletes] })),
-      ]);
-      if (failed) toast.error("Some changes didn't save to the server", { description: "They're kept here and will be retried when you edit again or reload." });
-    })();
-    await this.flushing;
-    this.flushing = null;
-  }
-}
-
-/** Notes are keyed by conversation; the synthetic `id` used for coalescing isn't sent. */
-const stripNotesId = (name: string) => (u: unknown) => {
-  if (name !== "notes") return u;
-  const rest: Record<string, unknown> = { ...(u as Record<string, unknown>) };
-  delete rest.id;
-  return rest;
-};
-
 /** Loads history for a live conversation the first time it's opened. */
 export function useEnsureMessages(conversation: Conversation | undefined) {
   const loaded = useWorkspace((s) => (conversation ? s.messages[conversation.id] !== undefined : true));

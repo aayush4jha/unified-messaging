@@ -8,7 +8,7 @@ export default function OnboardingPage() {
   const hydrated = useWorkspace((s) => s.hydrated);
   if (!hydrated)
     return (
-      <div className="flex h-dvh items-center justify-center bg-bg">
+      <div className="app-frame flex items-center justify-center bg-bg">
         <OrbitMark size={32} className="animate-pulse-dot" />
       </div>
     );

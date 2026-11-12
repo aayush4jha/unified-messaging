@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { useWorkspace } from "@/store/workspace";
+import { PwaRuntime } from "./pwa/pwa-runtime";
 import { ConfirmHost } from "./ui/dialog";
 import { TooltipProvider } from "./ui/tooltip";
 
@@ -40,6 +41,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider>
       {children}
+      <PwaRuntime />
       <ConfirmHost />
       <Toaster
         position="bottom-center"

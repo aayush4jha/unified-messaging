@@ -10,6 +10,7 @@ import { useWorkspace } from "@/store/workspace";
 import { OrbitMark } from "../brand/platform-icon";
 import { Skeleton } from "../ui/empty";
 import { LiveBridge } from "../live/live-bridge";
+import { OfflineBanner } from "../pwa/offline-banner";
 import { GlobalOverlays } from "./overlays";
 import { Sidebar } from "./sidebar";
 
@@ -26,14 +27,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!hydrated) return <ShellSkeleton />;
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-bg text-fg">
+    <div className="app-frame flex w-full overflow-hidden bg-bg text-fg">
       <Suspense fallback={<div className="w-[244px] border-r border-line bg-surface-sunken" />}>
         <div className="hidden md:flex">
           <Sidebar />
         </div>
         <MobileNav />
       </Suspense>
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col">
+        <OfflineBanner />
+        <div className="min-h-0 flex-1">{children}</div>
+      </main>
       <GlobalShortcuts />
       <LiveBridge />
       <Suspense fallback={null}>
@@ -52,7 +56,7 @@ function MobileNav() {
     <D.Root open={open} onOpenChange={setOpen}>
       <D.Portal>
         <D.Overlay className="fixed inset-0 z-50 bg-overlay data-[state=open]:animate-fade-in md:hidden" />
-        <D.Content className="fixed inset-y-0 left-0 z-50 flex shadow-xl outline-none data-[state=open]:animate-[slide-in-left_200ms_var(--ease-out)] md:hidden" aria-label="Navigation">
+        <D.Content className="fixed inset-y-0 left-0 z-50 flex bg-surface-sunken pb-safe pt-safe shadow-xl outline-none data-[state=open]:animate-[slide-in-left_200ms_var(--ease-out)] md:hidden" aria-label="Navigation">
           <D.Title className="sr-only">Navigation</D.Title>
           <D.Description className="sr-only">Folders, accounts and workspace pages</D.Description>
           <Sidebar mobile />
@@ -92,7 +96,7 @@ function GlobalShortcuts() {
 
 function ShellSkeleton() {
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-bg" aria-busy="true" aria-label="Loading Orbit">
+    <div className="app-frame flex w-full overflow-hidden bg-bg" aria-busy="true" aria-label="Loading Orbit">
       <div className="hidden w-[244px] shrink-0 flex-col gap-2 border-r border-line bg-surface-sunken p-3 md:flex">
         <div className="mb-2 flex items-center gap-2">
           <OrbitMark size={22} />

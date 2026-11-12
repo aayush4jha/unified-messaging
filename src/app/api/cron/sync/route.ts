@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/server/crypto";
 import { getServiceClient, supabaseConfigured } from "@/server/supabase";
+import { notifyUser } from "@/server/push";
 import { sendMessage, syncAccount } from "@/server/sync";
 
 export const maxDuration = 300;
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
       report.scheduledSent++;
     } catch (e) {
       await db.from("scheduled_messages").update({ status: "failed", error: (e as Error).message.slice(0, 300) }).eq("id", m.id);
-      await db.from("notifications").insert({ user_id: m.user_id, kind: "system", title: "A scheduled message failed", body: (e as Error).message.slice(0, 200), account_id: m.account_id });
+      await notifyUser(db, { user_id: m.user_id, kind: "system", title: "A scheduled message failed", body: (e as Error).message.slice(0, 200), account_id: m.account_id });
       report.scheduledFailed++;
     }
   }

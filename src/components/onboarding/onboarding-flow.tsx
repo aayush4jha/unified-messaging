@@ -38,7 +38,7 @@ export function OnboardingFlow() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-bg">
+    <div className="app-frame flex flex-col bg-bg">
       <header className="flex h-16 shrink-0 items-center justify-between px-5 sm:px-8">
         <OrbitLogo />
         <ol className="hidden items-center gap-1.5 sm:flex" aria-label="Progress">
@@ -67,7 +67,7 @@ export function OnboardingFlow() {
         )}
       </header>
 
-      <main className="flex flex-1 items-start justify-center overflow-y-auto px-5 pb-16 pt-6 sm:pt-12">
+      <main className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-5 pb-[max(4rem,calc(env(safe-area-inset-bottom)+2rem))] pt-6 sm:pt-12">
         <AnimatePresence mode="wait" custom={dir} initial={false}>
           <motion.div
             key={step}

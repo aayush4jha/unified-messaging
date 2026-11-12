@@ -37,6 +37,7 @@ import { confirm } from "../ui/dialog";
 import { EmptyState } from "../ui/empty";
 import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { useConversationActions } from "./actions";
+import { InstallBanner } from "../pwa/install";
 import { ConversationRow } from "./conversation-row";
 
 const FILTERS: { id: QuickFilter; label: string }[] = [
@@ -242,6 +243,7 @@ export function ConversationList({ route, className }: { route: ListRoute; class
       {/* Account status notice */}
       {account ? <AccountNotice accountId={account.id} /> : null}
       {mode === "demo" && !account ? <DemoNotice /> : null}
+      {!account ? <InstallBanner /> : null}
 
       {/* Bulk actions */}
       {selection.length > 0 ? (

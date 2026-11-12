@@ -10,7 +10,7 @@ export default function RouteError({ error, reset }: { error: Error & { digest?:
     console.error("[orbit] route error", error);
   }, [error]);
   return (
-    <div className="flex h-dvh flex-col items-center justify-center bg-bg px-6 text-center" role="alert">
+    <div className="app-frame flex flex-col items-center justify-center bg-bg px-6 text-center" role="alert">
       <OrbitMark size={40} />
       <h1 className="mt-6 text-[1.25rem] font-semibold tracking-[-0.02em]">Something went wrong</h1>
       <p className="mt-2 max-w-[380px] text-[0.875rem] text-fg-2">Orbit hit an unexpected error on this screen. Your messages are safe; nothing was sent or deleted.</p>

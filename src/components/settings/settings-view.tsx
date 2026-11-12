@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCw,
   Shield,
+  Smartphone,
   Sun,
   Tag,
   Trash2,
@@ -38,6 +39,8 @@ import { useWorkspace, type Preferences } from "@/store/workspace";
 import { IntegrationCatalog, startConnect, DemoCallout } from "../accounts/integration-catalog";
 import { PlatformIcon } from "../brand/platform-icon";
 import { PageHeader } from "../shell/page-header";
+import { Card, SectionTitle, SettingRow } from "./parts";
+import { MobileSection } from "./mobile-section";
 import { Button, IconButton } from "../ui/button";
 import { Badge, Input, Segmented, Switch } from "../ui/controls";
 import { confirm, Dialog, DialogBody, DialogContent } from "../ui/dialog";
@@ -48,6 +51,7 @@ const TABS = [
   { id: "accounts", label: "Accounts", icon: Plug },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "mobile", label: "Mobile app", icon: Smartphone },
   { id: "priority", label: "Priority rules", icon: Zap },
   { id: "labels", label: "Labels", icon: Tag },
   { id: "inbox", label: "Inbox", icon: Inbox },
@@ -86,6 +90,7 @@ export function SettingsView() {
             {tab === "accounts" ? <AccountsSection /> : null}
             {tab === "appearance" ? <AppearanceSection /> : null}
             {tab === "notifications" ? <NotificationsSection /> : null}
+            {tab === "mobile" ? <MobileSection /> : null}
             {tab === "priority" ? <PrioritySection /> : null}
             {tab === "labels" ? <LabelsSection /> : null}
             {tab === "inbox" ? <InboxSection /> : null}
@@ -99,34 +104,6 @@ export function SettingsView() {
 }
 
 /* --------------------------------------------------------------------------------------------- */
-
-function SectionTitle({ title, description, action }: { title: string; description?: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <div className="mb-4 flex items-end justify-between gap-4">
-      <div>
-        <h2 className="text-[1.0625rem] font-semibold tracking-[-0.015em]">{title}</h2>
-        {description ? <p className="mt-1 text-[0.8125rem] leading-5 text-fg-3">{description}</p> : null}
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("overflow-hidden rounded-lg border border-line bg-surface shadow-xs", className)}>{children}</div>;
-}
-
-function SettingRow({ title, description, children, className }: { title: React.ReactNode; description?: React.ReactNode; children?: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn("flex items-center gap-4 border-b border-line-subtle px-4 py-3.5 last:border-b-0", className)}>
-      <div className="min-w-0 flex-1">
-        <div className="text-[0.8125rem] font-medium text-fg">{title}</div>
-        {description ? <div className="mt-0.5 text-xs leading-[1.125rem] text-fg-3">{description}</div> : null}
-      </div>
-      {children ? <div className="shrink-0">{children}</div> : null}
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ Accounts */
 

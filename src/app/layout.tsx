@@ -10,9 +10,19 @@ export const metadata: Metadata = {
   title: { default: "Orbit", template: "%s · Orbit" },
   description: "One inbox. Every conversation. Every account. One workspace.",
   applicationName: "Orbit",
+  // iOS "Add to Home Screen": full-screen app with its own icon (src/app/apple-icon.png).
+  appleWebApp: { capable: true, title: "Orbit", statusBarStyle: "black-translucent" },
+  formatDetection: { telephone: false, email: false, address: false },
+  other: { "mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // Draw under the notch / home indicator; the app frame pads itself with safe-area insets.
+  viewportFit: "cover",
+  // Android: the on-screen keyboard shrinks the layout so the composer stays visible.
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#faf9f7" },
     { media: "(prefers-color-scheme: dark)", color: "#151413" },

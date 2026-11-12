@@ -230,7 +230,7 @@ function ComposeInner() {
       onKeyDown={onKeyDown}
       className={cn(
         "fixed z-50 flex flex-col overflow-hidden border border-line bg-surface-raised shadow-xl animate-scale-in",
-        "inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:rounded-lg",
+        "inset-0 pb-safe pt-safe sm:inset-auto sm:bottom-4 sm:right-4 sm:rounded-lg sm:p-0",
         expanded ? "sm:left-1/2 sm:top-[8vh] sm:bottom-[8vh] sm:w-[760px] sm:-translate-x-1/2" : "sm:h-[min(620px,calc(100vh-2rem))] sm:w-[560px]",
       )}
     >

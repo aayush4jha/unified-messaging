@@ -27,7 +27,7 @@ export function NotificationCenter() {
       <D.Portal>
         <D.Overlay className="fixed inset-0 z-[60] bg-overlay/60 data-[state=open]:animate-fade-in" />
         <D.Content
-          className="fixed inset-y-0 right-0 z-[61] flex w-full max-w-[400px] flex-col border-l border-line bg-surface-raised shadow-xl outline-none data-[state=open]:animate-[slide-in-right_220ms_var(--ease-out)]"
+          className="fixed inset-y-0 right-0 z-[61] flex w-full max-w-[400px] flex-col pb-safe pt-safe border-l border-line bg-surface-raised shadow-xl outline-none data-[state=open]:animate-[slide-in-right_220ms_var(--ease-out)]"
           aria-describedby={undefined}
           tabIndex={-1}
           onOpenAutoFocus={(e) => {

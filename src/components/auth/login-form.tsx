@@ -18,7 +18,7 @@ export function LoginForm({ configured }: { configured: boolean }) {
   const [error, setError] = useState(params.get("error"));
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-bg px-5">
+    <div className="app-frame flex flex-col items-center justify-center overflow-y-auto bg-bg px-5">
       <div className="w-full max-w-[380px]">
         <OrbitLogo className="mb-8" />
         <h1 className="text-[1.5rem] font-semibold tracking-[-0.03em]">Sign in to Orbit</h1>

@@ -6,6 +6,7 @@ import { getConnector } from "./connectors";
 import { normalizeTelegramUpdate, type TgUpdate } from "./connectors/telegram";
 import { AuthError, ConnectorError, RateLimitError, type ConnectorContext, type NormalizedConversation, type NormalizedMessage, type OutboundFile, type TokenSet } from "./connectors/types";
 import { identityFor } from "./identity";
+import { notifyUser } from "./push";
 import { getServiceClient } from "./supabase";
 
 /* ------------------------------------------------------------------ rows */
@@ -264,7 +265,7 @@ export async function syncAccount(userId: string, accountId: string, kind: "init
     const err = e as Error;
     if (e instanceof AuthError) {
       await db.from("connected_accounts").update({ status: "needs_reauth", status_message: err.message }).eq("id", accountId).eq("user_id", userId);
-      await db.from("notifications").insert({ user_id: userId, kind: "system", title: `${row.label} needs to reconnect`, body: err.message, account_id: accountId });
+      await notifyUser(db, { user_id: userId, kind: "system", title: `${row.label} needs to reconnect`, body: err.message, account_id: accountId });
       await db.from("sync_jobs").update({ status: "failed", finished_at: new Date().toISOString(), error: err.message }).eq("id", job?.id);
     } else if (e instanceof RateLimitError || (e instanceof ConnectorError && e.retryable)) {
       const retryAfter = e instanceof RateLimitError ? e.retryAfter : 60;
@@ -310,12 +311,13 @@ export async function ingestTelegramUpdate(db: SupabaseClient, row: AccountRow, 
  * for inbound messages bumps unread + creates a notification.
  */
 export async function ingestEvent(db: SupabaseClient, row: AccountRow, n: { conversation: NormalizedConversation; message: NormalizedMessage }): Promise<number> {
-  const { data: existing } = await db.from("conversations").select("title").eq("account_id", row.id).eq("external_id", n.conversation.externalId).maybeSingle();
+  const { data: existing } = await db.from("conversations").select("title,muted").eq("account_id", row.id).eq("external_id", n.conversation.externalId).maybeSingle();
   const convId = await upsertConversation(db, row, { ...n.conversation, title: existing?.title ?? n.conversation.title, unreadCount: 0 });
   const inserted = await insertMessages(db, row, convId, [n.message]);
   if (inserted && n.message.authorExternalId !== "me") {
     await db.rpc("increment_unread", { conv_id: convId });
-    if (row.notifications_enabled) await db.from("notifications").insert({ user_id: row.user_id, kind: "message", title: n.message.authorName ?? existing?.title ?? n.conversation.title, body: n.message.body.slice(0, 200) || "Sent an attachment", conversation_id: convId, account_id: row.id });
+    if (row.notifications_enabled)
+      await notifyUser(db, { user_id: row.user_id, kind: "message", title: n.message.authorName ?? existing?.title ?? n.conversation.title, body: n.message.body.slice(0, 200) || "Sent an attachment", conversation_id: convId, account_id: row.id }, { muted: Boolean(existing?.muted) });
   }
   return inserted;
 }

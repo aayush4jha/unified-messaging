@@ -44,10 +44,25 @@ export function decide(
   return { deliver: true, interrupt: true };
 }
 
-export async function showDesktopNotification(title: string, body: string, onClick?: () => void): Promise<boolean> {
+/**
+ * Shows a system notification. Goes through the service worker when one is
+ * active (required on Android, where `new Notification()` throws; taps are
+ * routed by the worker to `url`), otherwise uses the page Notification API.
+ */
+export async function showDesktopNotification(title: string, body: string, opts?: { url?: string; tag?: string; onClick?: () => void }): Promise<boolean> {
   if (typeof window === "undefined" || !("Notification" in window)) return false;
   if (Notification.permission !== "granted") return false;
-  const n = new Notification(title, { body, tag: `orbit-${title}`, silent: false });
-  if (onClick) n.onclick = () => (window.focus(), onClick());
-  return true;
+  const tag = opts?.tag ?? `orbit-${title}`;
+  try {
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
+    if (reg?.active) {
+      await reg.showNotification(title, { body, tag, icon: "/icons/icon-192.png", badge: "/icons/badge-96.png", data: { url: opts?.url ?? "/inbox" } });
+      return true;
+    }
+    const n = new Notification(title, { body, tag, silent: false });
+    if (opts?.onClick) n.onclick = () => (window.focus(), opts.onClick?.());
+    return true;
+  } catch {
+    return false;
+  }
 }
