@@ -48,6 +48,13 @@ export function AIPanel({ conversation: c, messages, needsReply, onUseReply }: {
   const [loading, setLoading] = useState<"summary" | "replies" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
+  const [hintHidden, setHintHidden] = useState(() => {
+    try {
+      return localStorage.getItem("orbit-ai-hint") === "hidden";
+    } catch {
+      return false;
+    }
+  });
 
   const caps = account ? capabilitiesFor(account.platform, account.capabilityOverrides) : null;
   const canReply = !!caps?.reply && account?.status !== "needs_reauth";
@@ -107,11 +114,25 @@ export function AIPanel({ conversation: c, messages, needsReply, onUseReply }: {
     toast("Added to follow-ups", { description: action });
   };
 
-  // AI not configured on the server: one quiet line, no dead buttons.
+  // AI not configured on the server: one quiet, dismissible line. No dead buttons.
   if (status && !configured) {
+    if (hintHidden) return null;
     return (
       <div className="mb-3 flex items-center gap-2 text-xs text-fg-4">
-        <Sparkles className="size-3" /> Summaries and smart replies need an Anthropic API key on the server (ANTHROPIC_API_KEY).
+        <Sparkles className="size-3 shrink-0" />
+        <span className="flex-1">Summaries and smart replies need an Anthropic API key on the server (ANTHROPIC_API_KEY).</span>
+        <button
+          aria-label="Hide this hint"
+          className="rounded-[4px] p-0.5 hover:bg-hover hover:text-fg-2"
+          onClick={() => {
+            setHintHidden(true);
+            try {
+              localStorage.setItem("orbit-ai-hint", "hidden");
+            } catch {}
+          }}
+        >
+          <X className="size-3" />
+        </button>
       </div>
     );
   }

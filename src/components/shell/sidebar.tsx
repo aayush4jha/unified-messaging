@@ -364,7 +364,7 @@ function NavItem({
       {icon}
       {!collapsed ? <span className="truncate">{label}</span> : null}
       {!collapsed && count ? <Count value={count} tone={countTone} /> : null}
-      {collapsed && count ? <span className="absolute right-1 top-1 size-1.5 rounded-full bg-accent" /> : null}
+      {collapsed && count && countTone === "accent" ? <span className="absolute right-1 top-1 size-1.5 rounded-full bg-accent" /> : null}
     </Link>
   );
   if (collapsed)

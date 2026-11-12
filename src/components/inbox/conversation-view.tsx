@@ -197,7 +197,7 @@ function ConversationHeader({
       <IconButton label="Back" className="lg:hidden" onClick={() => router.push(backHref)}>
         <ArrowLeft />
       </IconButton>
-      <Avatar name={c.kind === "channel" ? c.title : c.participants[0]?.name ?? c.title} hue={c.participants[0]?.avatarHue} group={c.kind === "channel"} size="sm" />
+      <Avatar name={c.kind === "channel" || c.kind === "group" ? c.title : c.participants[0]?.name ?? c.title} hue={c.kind === "group" ? undefined : c.participants[0]?.avatarHue} group={c.kind === "channel"} size="sm" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <h2 className="truncate text-[0.875rem] font-semibold tracking-[-0.01em]">{title}</h2>

@@ -86,7 +86,7 @@ export const ConversationRow = memo(function ConversationRow({
       >
         <div className="relative pt-0.5" style={{ "--avatar-ring": selected ? "var(--selected)" : checked ? "var(--surface)" : "var(--surface)" } as React.CSSProperties}>
           <span className={cn("block transition-opacity duration-100", checked && "opacity-0")}>
-            <Avatar name={c.kind === "channel" ? c.title : c.participants[0]?.name ?? c.title} hue={c.participants[0]?.avatarHue} group={c.kind === "channel"} platform={c.platform} />
+            <Avatar name={c.kind === "channel" || c.kind === "group" ? c.title : c.participants[0]?.name ?? c.title} hue={c.kind === "group" ? undefined : c.participants[0]?.avatarHue} group={c.kind === "channel"} platform={c.platform} />
           </span>
         </div>
 
