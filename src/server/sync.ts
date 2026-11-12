@@ -5,6 +5,7 @@ import { decryptJSON, encryptJSON } from "./crypto";
 import { getConnector } from "./connectors";
 import { normalizeTelegramUpdate, type TgUpdate } from "./connectors/telegram";
 import { AuthError, ConnectorError, RateLimitError, type ConnectorContext, type NormalizedConversation, type NormalizedMessage, type TokenSet } from "./connectors/types";
+import { identityFor } from "./identity";
 import { getServiceClient } from "./supabase";
 
 /* ------------------------------------------------------------------ rows */
@@ -115,12 +116,52 @@ export async function upsertConversation(db: SupabaseClient, row: AccountRow, nc
     .single();
   if (error) throw new Error(`conversation upsert: ${error.message}`);
   if (nc.participants.length) {
+    const linked = await Promise.all(nc.participants.map(async (p) => ({ p, contactId: await resolveContact(db, row, p) })));
     await db.from("conversation_participants").upsert(
-      nc.participants.map((p) => ({ conversation_id: data.id, user_id: row.user_id, external_id: p.externalId, name: p.name, handle: p.handle })),
+      linked.map(({ p, contactId }) => ({ conversation_id: data.id, user_id: row.user_id, external_id: p.externalId, name: p.name, handle: p.handle, contact_id: contactId })),
       { onConflict: "conversation_id,external_id" },
     );
+    // 1:1 conversations take their contact from the single participant.
+    if ((nc.kind === "dm" || nc.kind === "email") && linked.length === 1 && linked[0].contactId) {
+      await db.from("conversations").update({ contact_id: linked[0].contactId }).eq("id", data.id).eq("user_id", row.user_id);
+    }
   }
   return data.id as string;
+}
+
+/* ------------------------------------------------------------------ contact unification */
+
+export async function resolveContact(db: SupabaseClient, row: AccountRow, p: { externalId: string; name: string; handle?: string }): Promise<string | null> {
+  const id = identityFor(row.platform_id, row.external_account_id, p);
+  if (!id) return null;
+  let q = db.from("contact_identities").select("contact_id, contacts(merged_into)").eq("user_id", row.user_id).eq("kind", id.kind).eq("value", id.value);
+  q = id.platform_id ? q.eq("platform_id", id.platform_id) : q.is("platform_id", null);
+  const { data: found } = await q.maybeSingle();
+  if (found) {
+    const mergedInto = (found.contacts as unknown as { merged_into: string | null } | null)?.merged_into;
+    return mergedInto ?? (found.contact_id as string);
+  }
+  const { data: contact, error } = await db
+    .from("contacts")
+    .insert({ user_id: row.user_id, name: p.name || id.value, avatar_hue: hueOf(p.name || id.value) })
+    .select("id")
+    .single();
+  if (error || !contact) return null;
+  const ins = await db.from("contact_identities").insert({ user_id: row.user_id, contact_id: contact.id, kind: id.kind, platform_id: id.platform_id, value: id.value, display: p.handle ?? (id.kind === "email" ? id.value : p.name), account_id: row.id });
+  if (ins.error) {
+    // Lost a race with a concurrent sync: use the identity that won and drop our empty contact.
+    await db.from("contacts").delete().eq("id", contact.id).eq("user_id", row.user_id);
+    let retry = db.from("contact_identities").select("contact_id").eq("user_id", row.user_id).eq("kind", id.kind).eq("value", id.value);
+    retry = id.platform_id ? retry.eq("platform_id", id.platform_id) : retry.is("platform_id", null);
+    return ((await retry.maybeSingle()).data?.contact_id as string) ?? null;
+  }
+  return contact.id as string;
+}
+
+function hueOf(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % 360;
 }
 
 export async function insertMessages(db: SupabaseClient, row: AccountRow, conversationId: string, messages: NormalizedMessage[]): Promise<number> {

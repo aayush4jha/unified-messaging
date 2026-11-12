@@ -91,3 +91,19 @@ describe("telegram", () => {
     expect(normalizeTelegramUpdate({ update_id: 3 }, 1)).toBeNull();
   });
 });
+
+import { identityFor } from "@/server/identity";
+
+describe("contact identity matching", () => {
+  it("uses the email address (platform-agnostic) for email accounts", () => {
+    expect(identityFor("gmail", "sub1", { externalId: "Rahul@Lumen.io" })).toEqual({ kind: "email", platform_id: null, value: "rahul@lumen.io" });
+    expect(identityFor("outlook", "x", { externalId: "id", handle: "rahul@lumen.io" })?.value).toBe("rahul@lumen.io");
+  });
+  it("scopes Slack users by team so U123 in two workspaces are different people", () => {
+    expect(identityFor("slack", "T1:U9", { externalId: "U123" })?.value).toBe("T1:U123");
+    expect(identityFor("slack", "T2:U9", { externalId: "U123" })?.value).toBe("T2:U123");
+  });
+  it("never derives an identity from a display name", () => {
+    expect(identityFor("gmail", "sub1", { externalId: "Rahul Mehta" })).toBeNull();
+  });
+});

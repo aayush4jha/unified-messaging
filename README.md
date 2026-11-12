@@ -15,7 +15,7 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 
 ## Live accounts
 
-1. **Supabase.** Create a project and run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) in the SQL editor. It creates the schema, indexes and Row Level Security. Enable Email (magic link) auth.
+1. **Supabase.** Create a project and run the migrations in [`supabase/migrations/`](supabase/migrations) in order (`0001_init.sql`, then `0002_live_entities.sql`) in the SQL editor. They create the schema, indexes and Row Level Security. Enable Email (magic link) auth.
 2. **Environment.** Copy [`.env.example`](.env.example) to `.env.local` and fill it in. At minimum you need the Supabase keys, `ORBIT_TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`) and `ORBIT_PUBLIC_URL`.
 3. **Connectors.**
    - **Gmail**: create a Google OAuth client and enable the Gmail API. Add `${ORBIT_PUBLIC_URL}/api/connectors/gmail/callback` as a redirect URI. While the app is unverified, add yourself as a test user.
@@ -40,13 +40,13 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 | --- | --- |
 | Workspace UI (inbox, conversation views, compose, search, ⌘K, contacts, follow-ups, analytics, settings, onboarding, notifications) | Built and exercised end-to-end on the sample workspace |
 | Rule-based intelligence (priority, follow-ups, deadlines, briefing, NL search) | Built and unit-tested |
+| Live persistence of notes, reminders, labels, drafts, scheduled messages, priority rules, preferences and contacts (with reversible merges) | Built. Diffing is unit-tested. **Not yet exercised against a live Supabase project** |
 | Gmail / Slack / Telegram connectors, OAuth, encrypted tokens, sync, webhooks, idempotent send | Built. Parsing, signing and crypto are unit-tested. **Not yet exercised against live provider accounts** (needs your credentials) |
 | AI (summaries, smart replies, assistant, briefing prose) | Built on the Anthropic SDK with structured outputs. **Not yet exercised against the live API** (needs `ANTHROPIC_API_KEY`) |
 | Outlook, IMAP, Teams | Planned. The official APIs allow it ([details](docs/INTEGRATIONS.md)) |
 | WhatsApp, Instagram, Messenger, LinkedIn, Discord | Restricted by the platforms. Orbit explains why and links to the native app |
 
 Known gaps in live mode:
-- Notes, reminders, labels, contacts, drafts and scheduled messages are stored in the browser. The database tables exist, but server sync for them is next.
 - Sending attachments from live accounts isn't supported yet (receiving is).
 - Slack reactions and thread replies are shown, not editable.
 

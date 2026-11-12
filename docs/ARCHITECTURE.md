@@ -76,13 +76,30 @@ interface Connector {
    - server side, `messages (user_id, client_id)` is unique, so a retry after an ambiguous timeout returns the original result instead of sending twice.
 5. Undo-send: the composer holds outbound messages for a configurable window (default 5s) before dispatching.
 
-## 4. Sync
+## 4. Live persistence
+
+In live mode, `LiveBridge` (`src/components/live/live-bridge.tsx`) subscribes to the store, diffs each change with the pure functions in `src/lib/live-diff.ts`, and writes it through a debounced, coalescing outbox:
+
+| Change | Endpoint |
+| --- | --- |
+| Star, pin, archive, read, snooze, mute | `PATCH /api/conversations/:id` (mirrored to Gmail/Slack where supported) |
+| Labels on a conversation | `PUT /api/conversations/:id/labels` |
+| Account label, AI access, notifications, default sender, pause | `PATCH /api/accounts/:id` |
+| Reminders, notes, labels, drafts, scheduled messages, priority rules, contact edits | `POST /api/data/:collection` (batched upserts + deletes, Zod-validated, RLS-scoped) |
+| Contact merge / unmerge | `POST /api/contacts/merge`, `POST /api/contacts/unmerge` |
+| Preferences | `PUT /api/preferences` |
+
+Records that can be persisted use client-generated UUIDs, so optimistic local state and server rows share ids. Polling skips a refresh while writes are pending, so a slow save can't be overwritten by stale data.
+
+**Contact unification.** During sync, every participant resolves to a contact through an exact identity: an email address (platform-agnostic), a team-scoped Slack user, or a Telegram user id (`src/server/identity.ts`). Display names are never used for matching. Merges are reversible: identities remember `original_contact_id`, and the secondary contact stays, pointing at its primary through `merged_into`.
+
+## 5. Sync
 
 - **Initial sync**: `POST /api/sync/:accountId` pages through `listConversations` and `listMessages` and upserts into `conversations` and `messages`. Progress is recorded in `sync_jobs`.
 - **Incremental sync**: webhooks where available (Gmail Pub/Sub watch, Slack Events API, Telegram `setWebhook`). A scheduled job (`/api/cron/sync`, protected by `CRON_SECRET`) catches anything missed.
 - **Retries & rate limits**: connector errors are typed (`AuthError`, `RateLimitError` with `retryAfter`, `TransientError`). Jobs back off exponentially with jitter and honor `Retry-After`. Auth errors move the account to `needs_reauth` and surface a Reconnect action.
 
-## 5. Security
+## 6. Security
 
 - **OAuth only.** Orbit never asks for or stores account passwords.
 - **Tokens are encrypted at rest** (AES-256-GCM, key from `ORBIT_TOKEN_ENCRYPTION_KEY`) in `connected_accounts.encrypted_tokens`. They're decrypted only inside route handlers and never sent to the browser.
@@ -91,7 +108,7 @@ interface Connector {
 - **Webhooks** are verified (Slack signing secret, Telegram secret token header, Meta `X-Hub-Signature-256`).
 - **Audit log**: account connect, disconnect, data deletion and AI-permission changes are written to `audit_logs`.
 
-## 6. Data model
+## 7. Data model
 
 Normalized PostgreSQL schema (`supabase/migrations/0001_init.sql`):
 
@@ -102,13 +119,13 @@ Key decisions:
 - Contact identity is a separate `contact_identities` table (platform + handle). Merging contacts moves identities; unmerging moves them back. **Orbit never merges automatically on name alone.** Merge suggestions require a matching email address or phone number and always need user confirmation.
 - Full-text search: `messages.search_vector` (generated `tsvector`) with a GIN index.
 
-## 7. Intelligence
+## 8. Intelligence
 
 Two layers:
 
 1. **Deterministic signals** (`lib/intelligence/*`): priority scoring with human-readable reasons, follow-up detection (needs reply, waiting on them, your commitments, their deadlines), and the daily briefing assembly. These run on synced data, are unit-tested, and work without any LLM.
 2. **LLM features** (`/api/ai/*`): summaries, smart replies, the natural-language assistant and briefing prose. They're server-side only and receive only conversations from accounts where `ai_enabled = true`. AI never sends messages; every suggestion lands in an editable composer.
 
-## 8. Design system
+## 9. Design system
 
 See [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).

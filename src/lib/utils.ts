@@ -21,6 +21,16 @@ export function uid(prefix = "id"): string {
   return `${prefix}_${rand}`;
 }
 
+/** UUID for records that may be persisted server-side (reminders, drafts, labels…). */
+export function newId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  // RFC 4122 v4 fallback
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 /** Compact timestamp for list rows: 9:41, Yesterday, Mon, Oct 3, 3/14/24 */
 export function formatListTime(iso: string, now = new Date()): string {
   const d = new Date(iso);

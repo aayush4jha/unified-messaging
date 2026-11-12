@@ -26,7 +26,7 @@ import type {
   SendResult,
   ThemePreference,
 } from "@/lib/types";
-import { uid } from "@/lib/utils";
+import { newId, uid } from "@/lib/utils";
 import { transportFor } from "./transport";
 
 export type WorkspaceMode = "empty" | "demo" | "live";
@@ -104,7 +104,10 @@ export interface WorkspaceState {
   setHydrated(): void;
   loadDemo(): void;
   resetWorkspace(): void;
-  hydrateLive(data: Pick<WorkspaceState, "accounts" | "conversations" | "labels" | "reminders" | "notes" | "notifications">): void;
+  hydrateLive(
+    data: Pick<WorkspaceState, "accounts" | "conversations" | "labels" | "reminders" | "notes" | "notifications"> &
+      Partial<Pick<WorkspaceState, "contacts" | "drafts" | "scheduled" | "priorityRules">> & { preferences?: Partial<Preferences> | null },
+  ): void;
   setMessages(conversationId: string, messages: Message[]): void;
 
   /* conversations */
@@ -233,15 +236,18 @@ export const useWorkspace = create<WorkspaceState>()(
           set({ ...data, mode: "demo" });
         },
 
-        hydrateLive: (data) =>
+        hydrateLive: ({ preferences, ...data }) =>
           set((s) => ({
             ...data,
             mode: "live",
             // Keep already-loaded message lists for conversations that still exist.
             messages: Object.fromEntries(Object.entries(s.mode === "live" ? s.messages : {}).filter(([id]) => data.conversations.some((c) => c.id === id))),
-            contacts: s.mode === "live" ? s.contacts : [],
-            drafts: s.mode === "live" ? s.drafts : [],
-            scheduled: s.mode === "live" ? s.scheduled : [],
+            contacts: data.contacts ?? (s.mode === "live" ? s.contacts : []),
+            drafts: data.drafts ?? (s.mode === "live" ? s.drafts : []),
+            scheduled: data.scheduled ?? (s.mode === "live" ? s.scheduled : []),
+            priorityRules: data.priorityRules?.length ? data.priorityRules : s.priorityRules,
+            // Server preferences (from another device) apply only when provided, i.e. on first load.
+            prefs: preferences ? { ...s.prefs, ...preferences, onboarded: true } : s.prefs,
           })),
         setMessages: (conversationId, messages) =>
           set((s) => {
@@ -393,7 +399,7 @@ export const useWorkspace = create<WorkspaceState>()(
           }),
 
         saveDraft: (d) => {
-          const id = d.id ?? uid("dr");
+          const id = d.id ?? newId();
           set((s) => {
             const draft: Draft = { ...d, id, updatedAt: new Date().toISOString() };
             const exists = s.drafts.some((x) => x.id === id);
@@ -403,14 +409,14 @@ export const useWorkspace = create<WorkspaceState>()(
         },
         deleteDraft: (id) => set((s) => ({ drafts: s.drafts.filter((d) => d.id !== id) })),
         schedule: (m) => {
-          const id = uid("sch");
+          const id = newId();
           set((s) => ({ scheduled: [...s.scheduled, { ...m, id, createdAt: new Date().toISOString() }] }));
           return id;
         },
         cancelScheduled: (id) => set((s) => ({ scheduled: s.scheduled.filter((x) => x.id !== id) })),
 
         addReminder: (r) => {
-          const id = uid("rem");
+          const id = newId();
           set((s) => ({ reminders: [{ ...r, id, createdAt: new Date().toISOString() }, ...s.reminders] }));
           return id;
         },
@@ -568,11 +574,11 @@ export const useWorkspace = create<WorkspaceState>()(
           })),
         setPrefs: (patch) => set((s) => ({ prefs: { ...s.prefs, ...patch } })),
 
-        addRule: (rule) => set((s) => ({ priorityRules: [...s.priorityRules, { ...rule, id: uid("rule") }] })),
+        addRule: (rule) => set((s) => ({ priorityRules: [...s.priorityRules, { ...rule, id: newId() }] })),
         updateRule: (id, patch) => set((s) => ({ priorityRules: s.priorityRules.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
         deleteRule: (id) => set((s) => ({ priorityRules: s.priorityRules.filter((r) => r.id !== id) })),
         addLabel: (name, hue) => {
-          const id = uid("lbl");
+          const id = newId();
           set((s) => ({ labels: [...s.labels, { id, name, hue }] }));
           return id;
         },
