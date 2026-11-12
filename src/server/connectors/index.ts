@@ -1,5 +1,6 @@
 import type { PlatformId } from "@/lib/types";
 import { GmailConnector } from "./gmail";
+import { ImapConnector } from "./imap";
 import { InstagramConnector, MessengerConnector, WhatsAppConnector } from "./meta";
 import { OutlookConnector } from "./outlook";
 import { SlackConnector } from "./slack";
@@ -11,6 +12,7 @@ import type { Connector } from "./types";
 export const CONNECTORS: Partial<Record<PlatformId, Connector>> = {
   gmail: GmailConnector,
   outlook: OutlookConnector,
+  imap: ImapConnector,
   slack: SlackConnector,
   teams: TeamsConnector,
   telegram: TelegramConnector,

@@ -222,3 +222,36 @@ describe("meta business messaging", () => {
     expect(replyMode(undefined, now, true).ok).toBe(false);
   });
 });
+
+import { simpleParser } from "mailparser";
+import { assertPublicHost, groupImapThreads, isPrivateAddress, normalizeParsedMail, threadRoot, validatePorts } from "@/server/connectors/imap";
+
+describe("imap / smtp", () => {
+  it("blocks private, loopback, link-local and metadata addresses (SSRF)", async () => {
+    for (const ip of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.5", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "fe80::1", "::ffff:10.0.0.1"]) expect(isPrivateAddress(ip)).toBe(true);
+    for (const ip of ["17.42.251.41", "66.111.4.140", "2606:4700::1"]) expect(isPrivateAddress(ip)).toBe(false);
+    await expect(assertPublicHost("localhost")).rejects.toThrow(/public host/);
+    await expect(assertPublicHost("127.0.0.1")).rejects.toThrow(/public host/);
+    await expect(assertPublicHost("bad host!")).rejects.toThrow(/valid/);
+  });
+  it("requires TLS ports", () => {
+    expect(() => validatePorts({ imapPort: 143, smtpPort: 465 })).toThrow(/993/);
+    expect(() => validatePorts({ imapPort: 993, smtpPort: 25 })).toThrow(/465|587/);
+    expect(() => validatePorts({ imapPort: 993, smtpPort: 587 })).not.toThrow();
+  });
+  it("threads by References root and dedupes Sent copies", async () => {
+    expect(threadRoot({ messageId: "<c@x>", inReplyTo: "<b@x>", references: ["<a@x>", "<b@x>"] })).toBe("a@x");
+    expect(threadRoot({ messageId: "<a@x>" })).toBe("a@x");
+    const first = await simpleParser("Message-ID: <a@x>\r\nFrom: Sam <sam@fastmail.com>\r\nTo: me@icloud.com\r\nSubject: Project\r\nDate: Mon, 9 Nov 2026 10:00:00 +0000\r\n\r\nCan we talk?");
+    const reply = await simpleParser("Message-ID: <b@x>\r\nIn-Reply-To: <a@x>\r\nReferences: <a@x>\r\nFrom: Me <me@icloud.com>\r\nTo: sam@fastmail.com\r\nSubject: Re: Project\r\nDate: Mon, 9 Nov 2026 11:00:00 +0000\r\n\r\nSure.\r\n\r\nOn Mon, Sam wrote:\r\n> Can we talk?");
+    const msgs = [
+      normalizeParsedMail(first, "me@icloud.com", "INBOX", 1, false),
+      normalizeParsedMail(reply, "me@icloud.com", "Sent Messages", 7, true),
+      normalizeParsedMail(reply, "me@icloud.com", "INBOX", 2, true), // same message also in INBOX
+    ];
+    const [conv] = groupImapThreads(msgs, "me@icloud.com", "INBOX");
+    expect(conv).toMatchObject({ externalId: "a@x", title: "Project", unreadCount: 1, participants: [{ handle: "sam@fastmail.com" }] });
+    expect(conv.messages?.map((m) => [m.authorExternalId, m.body])).toEqual([["sam@fastmail.com", "Can we talk?"], ["me", "Sure."]]);
+    expect(conv.messages?.[0]).not.toHaveProperty("root");
+  });
+});

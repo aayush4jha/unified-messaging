@@ -117,6 +117,7 @@ export function ConnectAction({ info, status, expanded, onExpand }: { info: Plat
   if (info.support === "live" && status?.configured) {
     if (info.id === "telegram") return <TelegramConnect />;
     if (info.id === "whatsapp") return <WhatsAppConnect />;
+    if (info.id === "imap") return <ImapConnect />;
     return (
       <Button size="sm" variant="primary" onClick={() => startConnect(info.id)}>
         <Plug /> Connect {info.multiAccount ? "account" : ""}
@@ -191,6 +192,80 @@ function TelegramConnect() {
       <Button size="sm" variant="primary" disabled={!valid} loading={busy} type="submit">
         Connect
       </Button>
+    </form>
+  );
+}
+
+const IMAP_PROVIDERS = [
+  { id: "icloud", label: "iCloud" },
+  { id: "fastmail", label: "Fastmail" },
+  { id: "yahoo", label: "Yahoo" },
+  { id: "zoho", label: "Zoho" },
+  { id: "aol", label: "AOL" },
+  { id: "custom", label: "Other" },
+] as const;
+
+function ImapConnect() {
+  const router = useRouter();
+  const [provider, setProvider] = useState<(typeof IMAP_PROVIDERS)[number]["id"]>("icloud");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [imapHost, setImapHost] = useState("");
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("465");
+  const [busy, setBusy] = useState(false);
+  const custom = provider === "custom";
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && password.length >= 8 && (!custom || (imapHost && smtpHost));
+  return (
+    <form
+      className="space-y-1.5"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!valid) return;
+        setBusy(true);
+        try {
+          const r = await fetch("/api/connectors/imap/connect", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ provider, email: email.trim(), password, ...(custom ? { imapHost: imapHost.trim(), imapPort: 993, smtpHost: smtpHost.trim(), smtpPort: Number(smtpPort) } : {}) }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok) {
+            setPassword("");
+            toast.success(`Connected ${d.handle}`, { description: "Recent mail is syncing now." });
+            router.push("/inbox");
+          } else toast.error("Couldn't connect", { description: d.error ?? `Error ${r.status}` });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <select value={provider} onChange={(e) => setProvider(e.target.value as typeof provider)} aria-label="Email provider" className="h-7 w-full rounded-sm border border-line bg-surface px-2 text-xs">
+        {IMAP_PROVIDERS.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+      <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@icloud.com" aria-label="Email address" className="h-7 text-xs" type="email" autoComplete="email" />
+      {custom ? (
+        <div className="grid grid-cols-[1fr_auto] gap-1.5">
+          <Input value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder="IMAP host (port 993)" aria-label="IMAP host" className="h-7 font-mono text-xs" />
+          <span />
+          <Input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="SMTP host" aria-label="SMTP host" className="h-7 font-mono text-xs" />
+          <select value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} aria-label="SMTP port" className="h-7 rounded-sm border border-line bg-surface px-1.5 text-xs">
+            <option value="465">465 TLS</option>
+            <option value="587">587 STARTTLS</option>
+          </select>
+        </div>
+      ) : null}
+      <div className="flex gap-1.5">
+        <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="App-specific password" aria-label="App-specific password" className="h-7 font-mono text-xs" type="password" autoComplete="off" />
+        <Button size="sm" variant="primary" disabled={!valid} loading={busy} type="submit">
+          Connect
+        </Button>
+      </div>
+      <p className="text-[0.6875rem] leading-4 text-fg-4">Create an app-specific password in your provider&apos;s security settings. Never use your main password.</p>
     </form>
   );
 }

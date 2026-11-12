@@ -374,11 +374,11 @@ export async function sendMessage(userId: string, input: SendInput): Promise<{ m
   if (input.conversationId) {
     const { data } = await db.from("conversations").select("id, external_id").eq("id", input.conversationId).eq("user_id", userId).single();
     conv = data;
-    if ((row.platform_id === "gmail" || row.platform_id === "outlook") && conv) {
+    if ((row.platform_id === "gmail" || row.platform_id === "outlook" || row.platform_id === "imap") && conv) {
       const { data: last } = await db.from("messages").select("external_id, metadata").eq("conversation_id", conv.id).not("external_id", "is", null).order("sent_at", { ascending: false }).limit(1).maybeSingle();
       const meta = (last?.metadata ?? {}) as { messageIdHeader?: string; references?: string };
       // Gmail threads replies by RFC Message-ID headers; Graph replies to a message id (createReply).
-      if (row.platform_id === "gmail" && meta.messageIdHeader) replyTo = { messageExternalId: meta.messageIdHeader, references: meta.references };
+      if ((row.platform_id === "gmail" || row.platform_id === "imap") && meta.messageIdHeader) replyTo = { messageExternalId: meta.messageIdHeader, references: meta.references };
       if (row.platform_id === "outlook" && last?.external_id) replyTo = { messageExternalId: last.external_id as string };
     }
   }
@@ -417,7 +417,7 @@ export async function sendMessage(userId: string, input: SendInput): Promise<{ m
       // New conversation started by compose: create it now that the provider confirmed.
       const convId = await upsertConversation(db, row, {
         externalId: result.externalConversationId,
-        kind: row.platform_id === "gmail" || row.platform_id === "outlook" ? "email" : "dm",
+        kind: row.platform_id === "gmail" || row.platform_id === "outlook" || row.platform_id === "imap" ? "email" : "dm",
         title: input.subject || input.to.join(", "),
         participants: input.to.map((t) => ({ externalId: t, name: t, handle: t })),
         unreadCount: 0,

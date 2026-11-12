@@ -15,7 +15,7 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 | Slack | **Live** | Web API, OAuth v2 user token | Feasible with restrictions | Non-Marketplace apps get `conversations.history` at 1 request/min with 15 messages per call. Internal (self-hosted) apps are exempt. |
 | Telegram | **Live (Bot API)** | Bot API | Bot: inbox for chats with your bot | The Bot API can't read personal chats or start conversations. Personal chats need MTProto/TDLib (phone login, own `api_id`), which is planned. |
 | Outlook / Microsoft 365 | **Live** | Microsoft Graph mail | Fully feasible | `Mail.ReadWrite` and `Mail.Send` need no admin consent and work for personal accounts. Publisher verification is recommended. |
-| IMAP / SMTP | Planned | IMAP4rev2 / SMTP, XOAUTH2 | Feasible with restrictions | Gmail and Microsoft require OAuth. App passwords work only where the provider still offers them. |
+| IMAP / SMTP | **Live** | IMAP4rev2 / SMTP over TLS | Feasible with restrictions | App-specific passwords (iCloud, Fastmail, Yahoo, Zoho, AOL, self-hosted). Gmail and Microsoft require OAuth, so use their connectors. |
 | Microsoft Teams | **Live** | Graph chats, delegated | Feasible with restrictions | Work/school accounts only. Polling once per day, so Orbit syncs on change notifications (renewed daily; they last at most 3 days). |
 | WhatsApp | **Live (business numbers)** | Business Platform (Cloud API) | Not feasible for personal accounts | Business numbers only. Free-form replies within 24h, then paid templates. No history API. Onboarding *other* businesses needs Meta Tech Provider status (Embedded Signup). |
 | Instagram | **Live (professional accounts)** | Instagram API with Instagram Login | Professional accounts only | App Review plus Business Verification. 24h reply window (7 days with Human Agent tag). Only the 20 most recent messages per conversation are readable. |
@@ -55,6 +55,13 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 - **Files:** downloads use `files.info` → `url_private_download` with the user token; uploads use the v2 flow (`files.getUploadURLExternal` → upload → `files.completeUploadExternal`).
 - Messages are sent as **you** (user token). Thread replies keep `thread_ts`.
 - **Rate limits:** the connector honors `Retry-After` and schedules slow history backfill so the Marketplace throttle never fails a sync. Recent conversations are fetched first.
+
+### IMAP / SMTP (`src/server/connectors/imap.ts`)
+- **Credentials:** an app-specific password, encrypted at rest with the other tokens. Orbit never asks for an account's main password. Presets cover iCloud, Fastmail, Yahoo, Zoho and AOL; "Other" takes custom hosts.
+- **Connection safety:** hosts are user-supplied, so each one is resolved and rejected if it points at a private, loopback, link-local or metadata address (SSRF protection). TLS is required: IMAPS on 993, and SMTP on 465 (TLS) or 587 (STARTTLS, `requireTLS`). Credentials are verified against both servers before the account is saved.
+- **Sync:** recent mail from Inbox, Sent and Archive (special-use folders), parsed with mailparser and threaded by the References/In-Reply-To root Message-ID. Copies of the same message in two folders are deduplicated. There's no IMAP push here; the 5-minute cron picks up new mail.
+- **Send:** the RFC 5322 message is composed once, sent over SMTP with threading headers, then appended to Sent (most IMAP servers don't file SMTP mail themselves).
+- **Read / archive:** `\Seen` flags and moves to the Archive folder, applied to the whole thread.
 
 ### Meta business messaging (`src/server/connectors/meta.ts`)
 All three share one webhook, `/api/webhooks/meta`: a GET verify-token handshake, and POSTs that require `X-Hub-Signature-256` (HMAC with the app secret). Reply windows are enforced before calling Meta (`replyMode`): 24 hours after the customer's last message, or 7 days with the Human Agent tag when `META_HUMAN_AGENT_ENABLED=true` and the app holds that permission. Meta's own window errors (Messenger subcode 2018278, WhatsApp 131047) map to clear, non-retryable errors.

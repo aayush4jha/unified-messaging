@@ -15,7 +15,7 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 
 ## Live accounts
 
-1. **Supabase.** Create a project and run the migrations in [`supabase/migrations/`](supabase/migrations) in order (`0001` → `0006`) in the SQL editor. They create the schema, indexes and Row Level Security. Enable Email (magic link) auth.
+1. **Supabase.** Create a project and run the migrations in [`supabase/migrations/`](supabase/migrations) in order (`0001` → `0007`) in the SQL editor. They create the schema, indexes and Row Level Security. Enable Email (magic link) auth.
 2. **Environment.** Copy [`.env.example`](.env.example) to `.env.local` and fill it in. At minimum you need the Supabase keys, `ORBIT_TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`) and `ORBIT_PUBLIC_URL`.
 3. **Connectors.**
    - **Gmail**: create a Google OAuth client and enable the Gmail API. Add `${ORBIT_PUBLIC_URL}/api/connectors/gmail/callback` as a redirect URI. While the app is unverified, add yourself as a test user.
@@ -23,6 +23,7 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
    - **Microsoft Teams**: in the same app registration, add the redirect URI `${ORBIT_PUBLIC_URL}/api/connectors/teams/callback` and the delegated permissions `Chat.ReadWrite ChatMessage.Send`. These cover work/school accounts only, and some organizations require admin consent.
    - **Slack**: create an app with the user scopes listed in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md), set the redirect URL, and point Event Subscriptions to `/api/webhooks/slack`.
    - **WhatsApp / Messenger / Instagram (business accounts)**: create a Meta app and set the webhook to `/api/webhooks/meta` with your verify token (see `.env.example`). Messenger and Instagram use OAuth. For WhatsApp, paste a system-user token and phone number ID in Settings. Production use needs Meta App Review.
+   - **Other email (IMAP)**: no app setup. In Settings, pick the provider and paste an app-specific password.
    - **Telegram**: no app setup. Paste a bot token from @BotFather in Settings → Accounts.
 4. **Real time.** Run `0004_realtime.sql` so the inbox updates live via Supabase Realtime. With `ORBIT_PUBLIC_URL` set, Orbit also registers provider push: Outlook change notifications automatically, Gmail via Pub/Sub (see `.env.example`), and Slack/Telegram webhooks.
 5. **Background sync.** [`vercel.json`](vercel.json) schedules `/api/cron/sync` every 5 minutes (set `CRON_SECRET`). On other hosts, call it with `Authorization: Bearer $CRON_SECRET`.
@@ -45,9 +46,9 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 | Workspace UI (inbox, conversation views, compose, search, ⌘K, contacts, follow-ups, analytics, settings, onboarding, notifications) | Built and exercised end-to-end on the sample workspace |
 | Rule-based intelligence (priority, follow-ups, deadlines, briefing, NL search) | Built and unit-tested |
 | Live persistence of notes, reminders, labels, drafts, scheduled messages, priority rules, preferences and contacts (with reversible merges) | Built. Diffing is unit-tested. **Not yet exercised against a live Supabase project** |
-| Gmail / Outlook / Teams / Slack / Telegram / WhatsApp Business / Messenger Pages / Instagram professional connectors, OAuth, encrypted tokens, sync, webhooks, idempotent send | Built. Parsing, signing and crypto are unit-tested. **Not yet exercised against live provider accounts** (needs your credentials) |
+| Gmail / Outlook / IMAP / Teams / Slack / Telegram / WhatsApp Business / Messenger Pages / Instagram professional connectors, OAuth, encrypted tokens, sync, webhooks, idempotent send | Built. Parsing, signing and crypto are unit-tested. **Not yet exercised against live provider accounts** (needs your credentials) |
 | AI (summaries, smart replies, assistant, briefing prose) | Built on the Anthropic SDK with structured outputs. **Not yet exercised against the live API** (needs `ANTHROPIC_API_KEY`) |
-| IMAP | Planned. The official APIs allow it ([details](docs/INTEGRATIONS.md)) |
+| Personal Telegram (MTProto), Discord bots | Planned. Official APIs allow it ([details](docs/INTEGRATIONS.md)) |
 | Personal WhatsApp/Instagram/Messenger, LinkedIn, Discord DMs | Not possible through official APIs. Orbit explains why and links to the native app |
 
 Known gaps in live mode:
