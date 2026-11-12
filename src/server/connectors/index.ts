@@ -1,5 +1,6 @@
 import type { PlatformId } from "@/lib/types";
 import { GmailConnector } from "./gmail";
+import { InstagramConnector, MessengerConnector, WhatsAppConnector } from "./meta";
 import { OutlookConnector } from "./outlook";
 import { SlackConnector } from "./slack";
 import { TeamsConnector } from "./teams";
@@ -13,6 +14,9 @@ export const CONNECTORS: Partial<Record<PlatformId, Connector>> = {
   slack: SlackConnector,
   teams: TeamsConnector,
   telegram: TelegramConnector,
+  whatsapp: WhatsAppConnector,
+  messenger: MessengerConnector,
+  instagram: InstagramConnector,
 };
 
 export function getConnector(platform: string): Connector | undefined {

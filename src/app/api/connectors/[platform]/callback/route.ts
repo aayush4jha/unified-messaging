@@ -32,11 +32,13 @@ export async function GET(req: Request, ctx: RouteContext<"/api/connectors/[plat
   if (!user || user.id !== state.userId || state.platform !== platform) return fail("You were signed out during the connection. Please try again.");
 
   try {
-    const identity = await connector.exchangeCode(code, oauthRedirectUri(platform, req));
-    const accountId = await saveConnectedAccount(user.id, platform as PlatformId, identity);
+    const result = await connector.exchangeCode(code, oauthRedirectUri(platform, req));
+    const identities = Array.isArray(result) ? result : [result];
+    const accountIds: string[] = [];
+    for (const identity of identities) accountIds.push(await saveConnectedAccount(user.id, platform as PlatformId, identity));
     // Initial sync runs after the redirect so the user isn't kept waiting.
-    after(() => syncAccount(user.id, accountId, "initial").catch((e) => console.error("[sync] initial", e)));
-    const res = NextResponse.redirect(new URL(`/inbox?account=${accountId}&connected=1`, url));
+    for (const id of accountIds) after(() => syncAccount(user.id, id, "initial").catch((e) => console.error("[sync] initial", e)));
+    const res = NextResponse.redirect(new URL(`/inbox?account=${accountIds[0]}&connected=${accountIds.length}`, url));
     res.cookies.delete({ name: `orbit_oauth_${platform}`, path: "/api/connectors" });
     return res;
   } catch (e) {

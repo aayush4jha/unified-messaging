@@ -116,6 +116,7 @@ export function IntegrationCatalog({
 export function ConnectAction({ info, status, expanded, onExpand }: { info: PlatformInfo; status?: ConnectorStatus; expanded: boolean; onExpand: () => void }) {
   if (info.support === "live" && status?.configured) {
     if (info.id === "telegram") return <TelegramConnect />;
+    if (info.id === "whatsapp") return <WhatsAppConnect />;
     return (
       <Button size="sm" variant="primary" onClick={() => startConnect(info.id)}>
         <Plug /> Connect {info.multiAccount ? "account" : ""}
@@ -190,6 +191,42 @@ function TelegramConnect() {
       <Button size="sm" variant="primary" disabled={!valid} loading={busy} type="submit">
         Connect
       </Button>
+    </form>
+  );
+}
+
+function WhatsAppConnect() {
+  const router = useRouter();
+  const [token, setToken] = useState("");
+  const [phoneId, setPhoneId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const valid = token.trim().length > 20 && /^\d{6,20}$/.test(phoneId.trim());
+  return (
+    <form
+      className="space-y-1.5"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!valid) return;
+        setBusy(true);
+        try {
+          const r = await fetch("/api/connectors/whatsapp/connect", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: token.trim(), phoneNumberId: phoneId.trim() }) });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok) {
+            toast.success(`Connected ${d.handle}`, { description: "New WhatsApp messages will appear in your inbox." });
+            router.push("/inbox");
+          } else toast.error("Couldn't connect WhatsApp", { description: d.error ?? `Error ${r.status}` });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <Input value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder="Phone number ID" aria-label="WhatsApp phone number ID" className="h-7 font-mono text-xs" inputMode="numeric" />
+      <div className="flex gap-1.5">
+        <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="System-user access token" aria-label="WhatsApp access token" className="h-7 font-mono text-xs" type="password" autoComplete="off" />
+        <Button size="sm" variant="primary" disabled={!valid} loading={busy} type="submit">
+          Connect
+        </Button>
+      </div>
     </form>
   );
 }

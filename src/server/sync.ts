@@ -300,16 +300,34 @@ async function ensurePush(db: SupabaseClient, row: AccountRow, ctx: ConnectorCon
 }
 
 export async function ingestTelegramUpdate(db: SupabaseClient, row: AccountRow, update: TgUpdate): Promise<number> {
-  const botId = Number(row.external_account_id);
-  const n = normalizeTelegramUpdate(update, botId);
-  if (!n) return 0;
-  const convId = await upsertConversation(db, row, { ...n.conversation, unreadCount: 0 });
+  const n = normalizeTelegramUpdate(update, Number(row.external_account_id));
+  return n ? ingestEvent(db, row, n) : 0;
+}
+
+/**
+ * Ingests one pushed message (webhooks): upserts the conversation without
+ * clobbering a better title from sync, inserts the message idempotently, and
+ * for inbound messages bumps unread + creates a notification.
+ */
+export async function ingestEvent(db: SupabaseClient, row: AccountRow, n: { conversation: NormalizedConversation; message: NormalizedMessage }): Promise<number> {
+  const { data: existing } = await db.from("conversations").select("title").eq("account_id", row.id).eq("external_id", n.conversation.externalId).maybeSingle();
+  const convId = await upsertConversation(db, row, { ...n.conversation, title: existing?.title ?? n.conversation.title, unreadCount: 0 });
   const inserted = await insertMessages(db, row, convId, [n.message]);
   if (inserted && n.message.authorExternalId !== "me") {
     await db.rpc("increment_unread", { conv_id: convId });
-    if (row.notifications_enabled) await db.from("notifications").insert({ user_id: row.user_id, kind: "message", title: n.message.authorName ?? n.conversation.title, body: n.message.body.slice(0, 200), conversation_id: convId, account_id: row.id });
+    if (row.notifications_enabled) await db.from("notifications").insert({ user_id: row.user_id, kind: "message", title: n.message.authorName ?? existing?.title ?? n.conversation.title, body: n.message.body.slice(0, 200) || "Sent an attachment", conversation_id: convId, account_id: row.id });
   }
   return inserted;
+}
+
+/** Delivery/read receipts (WhatsApp statuses) for messages Orbit sent. */
+export async function applyStatuses(db: SupabaseClient, row: AccountRow, statuses: { externalId: string; status: "sent" | "delivered" | "read" | "failed" }[]) {
+  const rank = { pending: 0, sent: 1, delivered: 2, read: 3, failed: 4 } as const;
+  for (const st of statuses) {
+    const { data: m } = await db.from("messages").select("id,status").eq("user_id", row.user_id).eq("external_id", st.externalId).maybeSingle();
+    // Never downgrade (webhooks can arrive out of order).
+    if (m && (st.status === "failed" || rank[st.status] > rank[m.status as keyof typeof rank])) await db.from("messages").update({ status: st.status }).eq("id", m.id);
+  }
 }
 
 /* ------------------------------------------------------------------ send (idempotent) */
@@ -388,7 +406,12 @@ export async function sendMessage(userId: string, input: SendInput): Promise<{ m
 
   try {
     const ctx = contextFor(db, row);
-    const result = await connector.send(ctx, { clientId: input.clientId, externalConversationId: conv?.external_id, to: input.to, cc: input.cc, subject: input.subject, body: input.body, inReplyTo: replyTo, attachments: files });
+    let lastCustomerMessageAt: number | undefined;
+    if (conv && (row.platform_id === "whatsapp" || row.platform_id === "messenger" || row.platform_id === "instagram")) {
+      const { data: lastIn } = await db.from("messages").select("sent_at").eq("conversation_id", conv.id).neq("author_external_id", "me").order("sent_at", { ascending: false }).limit(1).maybeSingle();
+      lastCustomerMessageAt = lastIn ? new Date(lastIn.sent_at as string).getTime() : undefined;
+    }
+    const result = await connector.send(ctx, { clientId: input.clientId, externalConversationId: conv?.external_id, to: input.to, cc: input.cc, subject: input.subject, body: input.body, inReplyTo: replyTo, attachments: files, lastCustomerMessageAt });
 
     if (!conv) {
       // New conversation started by compose: create it now that the provider confirmed.

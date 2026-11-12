@@ -91,6 +91,8 @@ export interface DownloadedFile {
 export interface OutboundMessage {
   clientId: string;
   attachments?: OutboundFile[];
+  /** Epoch ms of the customer's last message (business messaging reply windows). */
+  lastCustomerMessageAt?: number;
   externalConversationId?: string;
   to: string[];
   cc?: string[];
@@ -116,7 +118,8 @@ export interface Connector {
   platform: PlatformId;
   isConfigured(): boolean;
   getAuthorizationUrl?(state: string, redirectUri: string): string;
-  exchangeCode?(code: string, redirectUri: string): Promise<ConnectedIdentity>;
+  /** May return several identities (e.g. every Facebook Page the user manages). */
+  exchangeCode?(code: string, redirectUri: string): Promise<ConnectedIdentity | ConnectedIdentity[]>;
   refresh?(tokens: TokenSet): Promise<TokenSet>;
   revoke?(tokens: TokenSet): Promise<void>;
   listConversations(ctx: ConnectorContext, cursor?: string): Promise<Page<NormalizedConversation>>;

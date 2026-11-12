@@ -177,3 +177,48 @@ describe("microsoft teams", () => {
     expect(normalizeTeamsMessage({ id: "3", messageType: "message", createdDateTime: "2026-11-12T10:00:00Z", deletedDateTime: "2026-11-12T10:05:00Z" }, me)).toBeNull();
   });
 });
+
+import { normalizeMessagingEvent, normalizeWhatsApp, replyMode, verifyMetaSignature } from "@/server/connectors/meta";
+
+describe("meta business messaging", () => {
+  it("verifies X-Hub-Signature-256 against any configured app secret", () => {
+    const body = '{"object":"page"}';
+    const sig = `sha256=${createHmac("sha256", "ig-secret").update(body).digest("hex")}`;
+    expect(verifyMetaSignature(body, sig, ["fb-secret", "ig-secret"])).toBe(true);
+    expect(verifyMetaSignature(body + " ", sig, ["fb-secret", "ig-secret"])).toBe(false);
+    expect(verifyMetaSignature(body, null, ["ig-secret"])).toBe(false);
+  });
+
+  it("keys Messenger/Instagram conversations by the customer and treats echoes as mine", () => {
+    const inbound = normalizeMessagingEvent({ sender: { id: "PSID1" }, recipient: { id: "PAGE" }, timestamp: 1700000000000, message: { mid: "m1", text: "Are prints available?" } }, "PAGE", "instagram");
+    expect(inbound?.conversation).toMatchObject({ externalId: "PSID1", unreadCount: 1 });
+    expect(inbound?.message).toMatchObject({ authorExternalId: "PSID1", body: "Are prints available?" });
+    const echo = normalizeMessagingEvent({ sender: { id: "PAGE" }, recipient: { id: "PSID1" }, timestamp: 1700000001000, message: { mid: "m2", text: "Yes!", is_echo: true } }, "PAGE", "instagram");
+    expect(echo?.conversation.externalId).toBe("PSID1");
+    expect(echo?.message.authorExternalId).toBe("me");
+  });
+
+  it("normalizes WhatsApp messages with profile names, media and receipts", () => {
+    const out = normalizeWhatsApp({
+      metadata: { phone_number_id: "PN1" },
+      contacts: [{ wa_id: "14155550161", profile: { name: "Sam Whitfield" } }],
+      messages: [
+        { from: "14155550161", id: "wamid.1", timestamp: "1700000000", type: "text", text: { body: "Do you take brand projects?" } },
+        { from: "14155550161", id: "wamid.2", timestamp: "1700000060", type: "document", document: { id: "MEDIA1", filename: "brief.pdf", mime_type: "application/pdf" } },
+      ],
+      statuses: [{ id: "wamid.out", status: "read", recipient_id: "14155550161", timestamp: "1700000100" }],
+    });
+    expect(out.messages[0].conversation).toMatchObject({ externalId: "14155550161", title: "Sam Whitfield" });
+    expect(out.messages[1].message.attachments[0]).toMatchObject({ externalId: "MEDIA1", name: "brief.pdf" });
+    expect(out.statuses).toEqual([{ externalId: "wamid.out", status: "read" }]);
+  });
+
+  it("enforces the 24-hour window, with a 7-day Human Agent extension only when enabled", () => {
+    const now = Date.UTC(2026, 10, 12);
+    expect(replyMode(now - 3_600_000, now, false)).toEqual({ ok: true });
+    expect(replyMode(now - 2 * 86_400_000, now, false).ok).toBe(false);
+    expect(replyMode(now - 2 * 86_400_000, now, true)).toEqual({ ok: true, tag: "HUMAN_AGENT" });
+    expect(replyMode(now - 8 * 86_400_000, now, true).ok).toBe(false);
+    expect(replyMode(undefined, now, true).ok).toBe(false);
+  });
+});

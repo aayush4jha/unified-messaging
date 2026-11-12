@@ -17,9 +17,9 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 | Outlook / Microsoft 365 | **Live** | Microsoft Graph mail | Fully feasible | `Mail.ReadWrite` and `Mail.Send` need no admin consent and work for personal accounts. Publisher verification is recommended. |
 | IMAP / SMTP | Planned | IMAP4rev2 / SMTP, XOAUTH2 | Feasible with restrictions | Gmail and Microsoft require OAuth. App passwords work only where the provider still offers them. |
 | Microsoft Teams | **Live** | Graph chats, delegated | Feasible with restrictions | Work/school accounts only. Polling once per day, so Orbit syncs on change notifications (renewed daily; they last at most 3 days). |
-| WhatsApp | Restricted | Business Platform (Cloud API) | Not feasible for personal accounts | Business numbers only. Free-form replies within 24h, then paid templates. Coexistence requires Meta Tech Provider status. |
-| Instagram | Restricted | Instagram API with Instagram Login | Professional accounts only | App Review plus Business Verification. 24h reply window (7 days with Human Agent tag). Only the 20 most recent messages per conversation are readable. |
-| Facebook Messenger | Restricted | Messenger Platform (Pages) | Page inboxes only | `pages_messaging` App Review, 24h window. Personal Messenger has no API. |
+| WhatsApp | **Live (business numbers)** | Business Platform (Cloud API) | Not feasible for personal accounts | Business numbers only. Free-form replies within 24h, then paid templates. No history API. Onboarding *other* businesses needs Meta Tech Provider status (Embedded Signup). |
+| Instagram | **Live (professional accounts)** | Instagram API with Instagram Login | Professional accounts only | App Review plus Business Verification. 24h reply window (7 days with Human Agent tag). Only the 20 most recent messages per conversation are readable. |
+| Facebook Messenger | **Live (Page inboxes)** | Messenger Platform (Pages) | Page inboxes only | `pages_messaging` App Review, 24h window. Personal Messenger has no API. |
 | LinkedIn | Restricted | Partner program | Not feasible | The Messages API is limited to approved partners, and partner access is closed. Orbit offers "Open LinkedIn Messaging". |
 | Discord | Restricted | Bot | Not feasible for personal DMs | No OAuth scope exposes user DMs, and self-bots break the ToS. A bot only sees servers it's added to. |
 
@@ -56,6 +56,14 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 - Messages are sent as **you** (user token). Thread replies keep `thread_ts`.
 - **Rate limits:** the connector honors `Retry-After` and schedules slow history backfill so the Marketplace throttle never fails a sync. Recent conversations are fetched first.
 
+### Meta business messaging (`src/server/connectors/meta.ts`)
+All three share one webhook, `/api/webhooks/meta`: a GET verify-token handshake, and POSTs that require `X-Hub-Signature-256` (HMAC with the app secret). Reply windows are enforced before calling Meta (`replyMode`): 24 hours after the customer's last message, or 7 days with the Human Agent tag when `META_HUMAN_AGENT_ENABLED=true` and the app holds that permission. Meta's own window errors (Messenger subcode 2018278, WhatsApp 131047) map to clear, non-retryable errors.
+- **Messenger (Pages):** Facebook Login for Business (`pages_show_list pages_messaging pages_manage_metadata pages_read_engagement business_management`). A long-lived user token yields non-expiring Page tokens, and **every Page you select becomes its own account**. Each Page is subscribed to the app's `messages,message_echoes` webhooks. History comes from the Conversations API.
+- **Instagram (professional accounts):** Instagram Login (`instagram_business_basic instagram_business_manage_messages`) with 60-day long-lived tokens, refreshed automatically. History is limited by Instagram to the 20 most recent messages per conversation.
+- **WhatsApp (Cloud API):** connect your own business number with a system-user token and phone number ID (Settings → Accounts). There's no history endpoint, so conversations start from webhooks. Delivered/read **receipts update message status** and never downgrade. Media downloads go through the Media API, and documents up to 16 MB can be sent. Starting conversations (templates) isn't supported.
+- Messenger and Instagram conversations are keyed by the customer's scoped id (PSID / IGSID), so webhook events and synced history always land in the same conversation.
+- `META_GRAPH_VERSION` defaults to `v24.0`. Set it to the version your app is pinned to.
+
 ### Telegram Bot (`src/server/connectors/telegram.ts`)
 - Files: `sendDocument` for uploads (50 MB) and `getFile` for downloads (bots can download up to 20 MB).
 - Connect by pasting a bot token from @BotFather. Orbit validates it with `getMe` and registers a webhook with a secret token.
@@ -65,5 +73,5 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 
 The demo workspace includes WhatsApp, LinkedIn, Instagram and personal Telegram conversations so the design can be judged with realistic data. All demo sends are simulated by `DemoTransport` and labeled as such.
 
-- **Personal WhatsApp, personal Instagram, personal Telegram and LinkedIn** samples are **Preview only**: their composers are disabled, with the real limitation and a link to the native app. This is exactly what a connected user would see for an unsupported capability.
+- **Personal WhatsApp, personal Instagram, personal Telegram and LinkedIn** samples are **Preview only**: their composers are disabled, with the real limitation and a link to the native app. This is exactly what a connected user would see, because those APIs don't exist for personal accounts.
 - **Business WhatsApp and Business Instagram** samples show the 24-hour customer-service window those APIs enforce: replies are allowed inside the window and blocked outside it.
