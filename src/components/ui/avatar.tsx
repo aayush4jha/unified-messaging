@@ -42,8 +42,8 @@ export function Avatar({
         {group ? "#" : initials(name)}
       </span>
       {platform ? (
-        <span className={cn("absolute -bottom-0.5 -right-0.5 rounded-[5px] ring-2 ring-[var(--avatar-ring,var(--surface))]", size === "lg" || size === "xl" ? "" : "")}>
-          <PlatformIcon platform={platform} size={size === "lg" || size === "xl" ? 18 : 14} />
+        <span className={cn("absolute rounded-[5px] ring-2 ring-[var(--avatar-ring,var(--surface))]", size === "lg" || size === "xl" ? "-bottom-1 -right-1" : "-bottom-1 -right-1.5")}>
+          <PlatformIcon platform={platform} size={size === "lg" || size === "xl" ? 18 : 15} />
         </span>
       ) : null}
     </span>

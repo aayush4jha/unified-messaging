@@ -39,12 +39,18 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
   { className, variant, size, asChild, loading, children, disabled, ...props },
   ref,
 ) {
-  const Comp = asChild ? Slot.Root : "button";
+  if (asChild) {
+    return (
+      <Slot.Root ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props}>
+        {children}
+      </Slot.Root>
+    );
+  }
   return (
-    <Comp ref={ref} className={cn(buttonVariants({ variant, size }), className)} disabled={disabled || loading} {...props}>
+    <button ref={ref} className={cn(buttonVariants({ variant, size }), className)} disabled={disabled || loading} {...props}>
       {loading ? <Spinner /> : null}
       {children}
-    </Comp>
+    </button>
   );
 });
 
