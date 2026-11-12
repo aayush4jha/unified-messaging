@@ -201,13 +201,18 @@ export interface SyncStats {
   rateLimited?: boolean;
 }
 
-export async function syncAccount(userId: string, accountId: string, kind: "initial" | "incremental" = "incremental"): Promise<SyncStats> {
+export async function syncAccount(userId: string, accountId: string, kind: "initial" | "incremental" | "webhook" = "incremental"): Promise<SyncStats> {
   const db = getServiceClient();
   const row = await loadAccount(db, userId, accountId);
   if (!row) throw new Error("Account not found");
   if (row.status === "paused") return { conversations: 0, messages: 0 };
   const connector = getConnector(row.platform_id);
   if (!connector) throw new Error(`No connector for ${row.platform_id}`);
+  // Respect provider polling policies (Teams: once a day). Push-triggered and first syncs aren't polling.
+  if (kind === "incremental" && connector.minPollIntervalMs && row.last_synced_at && Date.now() - new Date(row.last_synced_at).getTime() < connector.minPollIntervalMs) {
+    await ensurePush(db, row, contextFor(db, row)).catch((e) => console.error("[push] renew failed", row.platform_id, e));
+    return { conversations: 0, messages: 0 };
+  }
 
   const { data: job } = await db.from("sync_jobs").insert({ user_id: userId, account_id: accountId, kind, status: "running", started_at: new Date().toISOString(), attempts: 1 }).select("id").single();
   await db.from("connected_accounts").update({ status: "syncing" }).eq("id", accountId).eq("user_id", userId);

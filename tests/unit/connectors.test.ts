@@ -155,3 +155,25 @@ describe("gmail attachments (MIME)", () => {
     expect(filenameParams('a"b.txt')).toMatch(/^filename="a_b\.txt"/);
   });
 });
+
+import { normalizeTeamsChat, normalizeTeamsMessage } from "@/server/connectors/teams";
+
+describe("microsoft teams", () => {
+  const me = "u-me";
+  it("titles 1:1 chats by the other person and flags unread from the viewpoint", () => {
+    const c = normalizeTeamsChat(
+      { id: "19:abc", chatType: "oneOnOne", members: [{ userId: me, displayName: "Alex" }, { userId: "u-p", displayName: "Priya Sharma", email: "priya@contoso.com" }], lastMessagePreview: { createdDateTime: "2026-11-12T10:00:00Z", from: { user: { id: "u-p" } } }, viewpoint: { lastMessageReadDateTime: "2026-11-12T09:00:00Z" } },
+      me,
+    );
+    expect(c).toMatchObject({ kind: "dm", title: "Priya Sharma", unreadCount: 1, participants: [{ externalId: "u-p", handle: "priya@contoso.com" }] });
+  });
+  it("uses the topic for group chats and isn't unread when the last message is mine", () => {
+    const c = normalizeTeamsChat({ id: "19:g", chatType: "group", topic: "Launch crew", members: [{ userId: me }, { userId: "a" }, { userId: "b" }], lastMessagePreview: { createdDateTime: "2026-11-12T10:00:00Z", from: { user: { id: me } } } }, me);
+    expect(c).toMatchObject({ kind: "group", title: "Launch crew", unreadCount: 0 });
+  });
+  it("converts HTML bodies, marks own messages and drops system events", () => {
+    expect(normalizeTeamsMessage({ id: "1", messageType: "message", createdDateTime: "2026-11-12T10:00:00Z", from: { user: { id: me } }, body: { contentType: "html", content: "<p>Ship it <b>today</b></p>" } }, me)).toMatchObject({ authorExternalId: "me", body: "Ship it today" });
+    expect(normalizeTeamsMessage({ id: "2", messageType: "systemEventMessage", createdDateTime: "2026-11-12T10:00:00Z" }, me)).toBeNull();
+    expect(normalizeTeamsMessage({ id: "3", messageType: "message", createdDateTime: "2026-11-12T10:00:00Z", deletedDateTime: "2026-11-12T10:05:00Z" }, me)).toBeNull();
+  });
+});

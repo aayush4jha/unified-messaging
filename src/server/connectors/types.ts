@@ -129,6 +129,8 @@ export interface Connector {
   subscribe?(ctx: ConnectorContext, opts: { notificationUrl: string; secret: string; existing?: Record<string, unknown> }): Promise<Record<string, unknown> | null>;
   /** Fetches a received attachment from the provider (Orbit doesn't store file bytes). */
   downloadAttachment?(ctx: ConnectorContext, messageExternalId: string, attachment: NormalizedAttachment): Promise<DownloadedFile>;
+  /** Provider policy floor between *polling* syncs (push-triggered syncs aren't limited). */
+  minPollIntervalMs?: number;
   /** Per-file and total limits for outbound attachments (bytes). */
   attachmentLimits?: { perFile: number; total: number };
   archive?(ctx: ConnectorContext, externalConversationId: string, archived: boolean): Promise<void>;

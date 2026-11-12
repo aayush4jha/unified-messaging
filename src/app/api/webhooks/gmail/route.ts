@@ -25,6 +25,6 @@ export async function POST(req: Request) {
   if (!email) return new NextResponse(null, { status: 204 });
 
   const { data: accounts } = await getServiceClient().from("connected_accounts").select("id,user_id").eq("platform_id", "gmail").eq("handle", email).neq("status", "paused");
-  for (const a of accounts ?? []) after(() => syncAccount(a.user_id, a.id, "incremental").catch((e) => console.error("[gmail push] sync", e)));
+  for (const a of accounts ?? []) after(() => syncAccount(a.user_id, a.id, "webhook").catch((e) => console.error("[gmail push] sync", e)));
   return new NextResponse(null, { status: 204 });
 }

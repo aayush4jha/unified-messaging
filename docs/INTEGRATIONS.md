@@ -16,7 +16,7 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 | Telegram | **Live (Bot API)** | Bot API | Bot: inbox for chats with your bot | The Bot API can't read personal chats or start conversations. Personal chats need MTProto/TDLib (phone login, own `api_id`), which is planned. |
 | Outlook / Microsoft 365 | **Live** | Microsoft Graph mail | Fully feasible | `Mail.ReadWrite` and `Mail.Send` need no admin consent and work for personal accounts. Publisher verification is recommended. |
 | IMAP / SMTP | Planned | IMAP4rev2 / SMTP, XOAUTH2 | Feasible with restrictions | Gmail and Microsoft require OAuth. App passwords work only where the provider still offers them. |
-| Microsoft Teams | Planned | Graph chats, delegated | Feasible with restrictions | Work/school accounts only. Polling once per day, so change notifications are needed (renewed every 3 days). |
+| Microsoft Teams | **Live** | Graph chats, delegated | Feasible with restrictions | Work/school accounts only. Polling once per day, so Orbit syncs on change notifications (renewed daily; they last at most 3 days). |
 | WhatsApp | Restricted | Business Platform (Cloud API) | Not feasible for personal accounts | Business numbers only. Free-form replies within 24h, then paid templates. Coexistence requires Meta Tech Provider status. |
 | Instagram | Restricted | Instagram API with Instagram Login | Professional accounts only | App Review plus Business Verification. 24h reply window (7 days with Human Agent tag). Only the 20 most recent messages per conversation are readable. |
 | Facebook Messenger | Restricted | Messenger Platform (Pages) | Page inboxes only | `pages_messaging` App Review, 24h window. Personal Messenger has no API. |
@@ -43,6 +43,12 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 - **Incremental sync** uses Graph delta queries (Inbox and Sent Items) and stores the `deltaLink`.
 - **Push:** a change-notification subscription on Inbox messages (`/api/webhooks/outlook`), verified by a per-account `clientState`, renewed daily (mail subscriptions last up to 7 days).
 - **Limits:** about 10,000 requests per 10 minutes per mailbox. 429s are retried after `Retry-After`.
+
+### Microsoft Teams (`src/server/connectors/teams.ts`)
+- **Scopes (delegated):** `User.Read Chat.ReadWrite ChatMessage.Send offline_access`, via the `organizations` authority (work/school accounts only). Uses the same Microsoft app registration as Outlook, with redirect URI `/api/connectors/teams/callback`. Some tenants require admin consent.
+- **Sync:** `/me/chats` (with members and the read viewpoint) and `/chats/{id}/messages`. HTML bodies are converted to text, and system events and deleted messages are skipped.
+- **Policy:** Microsoft only allows *polling* Teams messages once per day. Orbit's cron respects that (`minPollIntervalMs`), and new messages arrive through a `/users/{id}/chats/getAllMessages` change subscription (`/api/webhooks/teams`, clientState-verified, renewed daily).
+- **Send:** replies post to the chat as you. "New message" creates a 1:1 chat by email address, then sends.
 
 ### Slack (`src/server/connectors/slack.ts`)
 - **User-token scopes:** `channels:history groups:history im:history mpim:history channels:read groups:read im:read mpim:read users:read chat:write files:read files:write` (+ the `*:write` conversation scopes for marking read).

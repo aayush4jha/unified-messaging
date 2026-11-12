@@ -2,7 +2,7 @@
 
 **One inbox. Every conversation. Every account. One workspace.**
 
-Orbit is a unified communication workspace. It brings email, work chat and messaging into one keyboard-first interface: multiple Gmail and Outlook accounts, Slack workspaces and Telegram bots, with an assistant that briefs you, summarizes threads and drafts replies. It never sends anything on its own.
+Orbit is a unified communication workspace. It brings email, work chat and messaging into one keyboard-first interface: multiple Gmail and Outlook accounts, Microsoft Teams, Slack workspaces and Telegram bots, with an assistant that briefs you, summarizes threads and drafts replies. It never sends anything on its own.
 
 ## Quick start (sample workspace)
 
@@ -15,11 +15,12 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 
 ## Live accounts
 
-1. **Supabase.** Create a project and run the migrations in [`supabase/migrations/`](supabase/migrations) in order (`0001` → `0004`) in the SQL editor. They create the schema, indexes and Row Level Security. Enable Email (magic link) auth.
+1. **Supabase.** Create a project and run the migrations in [`supabase/migrations/`](supabase/migrations) in order (`0001` → `0005`) in the SQL editor. They create the schema, indexes and Row Level Security. Enable Email (magic link) auth.
 2. **Environment.** Copy [`.env.example`](.env.example) to `.env.local` and fill it in. At minimum you need the Supabase keys, `ORBIT_TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`) and `ORBIT_PUBLIC_URL`.
 3. **Connectors.**
    - **Gmail**: create a Google OAuth client and enable the Gmail API. Add `${ORBIT_PUBLIC_URL}/api/connectors/gmail/callback` as a redirect URI. While the app is unverified, add yourself as a test user.
    - **Outlook / Microsoft 365**: register an app in the Entra admin center for "any organizational directory and personal Microsoft accounts". Add the redirect URI `${ORBIT_PUBLIC_URL}/api/connectors/outlook/callback` and the delegated permissions `User.Read Mail.ReadWrite Mail.Send offline_access`.
+   - **Microsoft Teams**: in the same app registration, add the redirect URI `${ORBIT_PUBLIC_URL}/api/connectors/teams/callback` and the delegated permissions `Chat.ReadWrite ChatMessage.Send`. These cover work/school accounts only, and some organizations require admin consent.
    - **Slack**: create an app with the user scopes listed in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md), set the redirect URL, and point Event Subscriptions to `/api/webhooks/slack`.
    - **Telegram**: no app setup. Paste a bot token from @BotFather in Settings → Accounts.
 4. **Real time.** Run `0004_realtime.sql` so the inbox updates live via Supabase Realtime. With `ORBIT_PUBLIC_URL` set, Orbit also registers provider push: Outlook change notifications automatically, Gmail via Pub/Sub (see `.env.example`), and Slack/Telegram webhooks.
@@ -43,9 +44,9 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 | Workspace UI (inbox, conversation views, compose, search, ⌘K, contacts, follow-ups, analytics, settings, onboarding, notifications) | Built and exercised end-to-end on the sample workspace |
 | Rule-based intelligence (priority, follow-ups, deadlines, briefing, NL search) | Built and unit-tested |
 | Live persistence of notes, reminders, labels, drafts, scheduled messages, priority rules, preferences and contacts (with reversible merges) | Built. Diffing is unit-tested. **Not yet exercised against a live Supabase project** |
-| Gmail / Outlook / Slack / Telegram connectors, OAuth, encrypted tokens, sync, webhooks, idempotent send | Built. Parsing, signing and crypto are unit-tested. **Not yet exercised against live provider accounts** (needs your credentials) |
+| Gmail / Outlook / Teams / Slack / Telegram connectors, OAuth, encrypted tokens, sync, webhooks, idempotent send | Built. Parsing, signing and crypto are unit-tested. **Not yet exercised against live provider accounts** (needs your credentials) |
 | AI (summaries, smart replies, assistant, briefing prose) | Built on the Anthropic SDK with structured outputs. **Not yet exercised against the live API** (needs `ANTHROPIC_API_KEY`) |
-| IMAP, Teams | Planned. The official APIs allow it ([details](docs/INTEGRATIONS.md)) |
+| IMAP | Planned. The official APIs allow it ([details](docs/INTEGRATIONS.md)) |
 | WhatsApp, Instagram, Messenger, LinkedIn, Discord | Restricted by the platforms. Orbit explains why and links to the native app |
 
 Known gaps in live mode:
