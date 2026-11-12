@@ -33,7 +33,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/connectors/[plat
 
   try {
     const identity = await connector.exchangeCode(code, oauthRedirectUri(platform, req));
-    const accountId = await saveConnectedAccount(user.id, platform as PlatformId, identity, platform === "gmail" || platform === "outlook" ? { capability_overrides: { attachments: false } } : {});
+    const accountId = await saveConnectedAccount(user.id, platform as PlatformId, identity);
     // Initial sync runs after the redirect so the user isn't kept waiting.
     after(() => syncAccount(user.id, accountId, "initial").catch((e) => console.error("[sync] initial", e)));
     const res = NextResponse.redirect(new URL(`/inbox?account=${accountId}&connected=1`, url));

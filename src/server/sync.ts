@@ -4,7 +4,7 @@ import type { Account, Conversation, Message, PlatformId } from "@/lib/types";
 import { decryptJSON, encryptJSON } from "./crypto";
 import { getConnector } from "./connectors";
 import { normalizeTelegramUpdate, type TgUpdate } from "./connectors/telegram";
-import { AuthError, ConnectorError, RateLimitError, type ConnectorContext, type NormalizedConversation, type NormalizedMessage, type TokenSet } from "./connectors/types";
+import { AuthError, ConnectorError, RateLimitError, type ConnectorContext, type NormalizedConversation, type NormalizedMessage, type OutboundFile, type TokenSet } from "./connectors/types";
 import { identityFor } from "./identity";
 import { getServiceClient } from "./supabase";
 
@@ -280,6 +280,7 @@ export async function ingestTelegramUpdate(db: SupabaseClient, row: AccountRow, 
 
 export interface SendInput {
   clientId: string;
+  attachments?: OutboundFile[];
   accountId: string;
   conversationId?: string;
   to: string[];
@@ -303,6 +304,16 @@ export async function sendMessage(userId: string, input: SendInput): Promise<{ m
   if (row.status === "needs_reauth") throw new AuthError(`${row.label} needs to reconnect before it can send.`);
   const connector = getConnector(row.platform_id);
   if (!connector) throw new ConnectorError("Sending isn't supported for this platform.", false);
+  const files = input.attachments ?? [];
+  if (files.length) {
+    const limits = connector.attachmentLimits;
+    if (!limits) throw new ConnectorError("This account can't send attachments.", false);
+    const total = files.reduce((n, f) => n + f.data.length, 0);
+    const big = files.find((f) => f.data.length > limits.perFile);
+    if (big) throw new ConnectorError(`${big.name} is larger than ${Math.round(limits.perFile / 1024 / 1024)} MB, the limit for this account.`, false);
+    if (total > limits.total) throw new ConnectorError(`Attachments total more than ${Math.round(limits.total / 1024 / 1024)} MB, the limit for this account.`, false);
+  }
+  const attachmentMeta = files.map((f) => ({ name: f.name, mimeType: f.mimeType, size: f.data.length }));
 
   let conv: { id: string; external_id: string } | null = null;
   let replyTo: { messageExternalId: string; references?: string } | undefined;
@@ -330,6 +341,7 @@ export async function sendMessage(userId: string, input: SendInput): Promise<{ m
     cc_addrs: input.cc ?? [],
     status: "pending",
     sent_at: new Date().toISOString(),
+    metadata: { attachments: attachmentMeta },
   };
   let pendingId = prior.data?.id as string | undefined;
   if (conv && !pendingId) {
@@ -340,7 +352,7 @@ export async function sendMessage(userId: string, input: SendInput): Promise<{ m
 
   try {
     const ctx = contextFor(db, row);
-    const result = await connector.send(ctx, { clientId: input.clientId, externalConversationId: conv?.external_id, to: input.to, cc: input.cc, subject: input.subject, body: input.body, inReplyTo: replyTo });
+    const result = await connector.send(ctx, { clientId: input.clientId, externalConversationId: conv?.external_id, to: input.to, cc: input.cc, subject: input.subject, body: input.body, inReplyTo: replyTo, attachments: files });
 
     if (!conv) {
       // New conversation started by compose: create it now that the provider confirmed.
@@ -376,7 +388,14 @@ export function rowToMessage(r: Record<string, unknown>): Message {
     body: (r.body as string) ?? "",
     sentAt: r.sent_at as string,
     status: r.status as Message["status"],
-    attachments: (meta.attachments ?? []).map((a, i) => ({ id: a.externalId ?? `${r.id}_${i}`, name: a.name, mimeType: a.mimeType, size: a.size })),
+    attachments: (meta.attachments ?? []).map((a, i) => ({
+      id: a.externalId ?? `${r.id}_${i}`,
+      name: a.name,
+      mimeType: a.mimeType,
+      size: a.size,
+      // Received files stream through Orbit's authenticated proxy; sent files live in the provider's Sent folder.
+      url: r.author_external_id !== "me" && a.externalId ? `/api/attachments/${r.id}/${i}` : undefined,
+    })),
     subject: (r.subject as string) ?? undefined,
     to: (r.to_addrs as string[]) ?? [],
     cc: (r.cc_addrs as string[]) ?? [],

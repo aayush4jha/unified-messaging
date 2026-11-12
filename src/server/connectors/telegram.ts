@@ -126,9 +126,36 @@ export const TelegramConnector: Connector = {
     return { items: [] };
   },
 
+  // Bots can upload up to 50 MB per file and download up to 20 MB.
+  attachmentLimits: { perFile: 50 * 1024 * 1024, total: 50 * 1024 * 1024 },
+
   async send(ctx: ConnectorContext, msg) {
     if (!msg.externalConversationId) throw new ConnectorError("Telegram bots can only reply to people who messaged them first.", false);
-    const r = await call<TgMessage>(ctx.tokens.accessToken, "sendMessage", { chat_id: msg.externalConversationId, text: msg.body });
-    return { externalMessageId: String(r.message_id), externalConversationId: String(r.chat.id), sentAt: new Date(r.date * 1000).toISOString() };
+    const files = msg.attachments ?? [];
+    let last: TgMessage | undefined;
+    if (msg.body.trim() && (files.length !== 1 || msg.body.length > 1024)) {
+      last = await call<TgMessage>(ctx.tokens.accessToken, "sendMessage", { chat_id: msg.externalConversationId, text: msg.body });
+    }
+    for (const f of files) {
+      const form = new FormData();
+      form.set("chat_id", msg.externalConversationId);
+      if (files.length === 1 && msg.body.trim() && msg.body.length <= 1024) form.set("caption", msg.body);
+      form.set("document", new Blob([new Uint8Array(f.data)], { type: f.mimeType }), f.name);
+      const res = await providerFetch(api(ctx.tokens.accessToken, "sendDocument"), { label: "telegram sendDocument", method: "POST", body: form });
+      const d = await res.json();
+      if (!d.ok) throw new ConnectorError(`Telegram sendDocument: ${d.description ?? res.status}`, res.status >= 500);
+      last = d.result as TgMessage;
+    }
+    if (!last) throw new ConnectorError("Nothing to send.", false);
+    return { externalMessageId: String(last.message_id), externalConversationId: String(last.chat.id), sentAt: new Date(last.date * 1000).toISOString() };
+  },
+
+  async downloadAttachment(ctx, _messageId, att) {
+    if (!att.externalId) throw new ConnectorError("This file can't be downloaded.", false);
+    const f = await call<{ file_path?: string; file_size?: number }>(ctx.tokens.accessToken, "getFile", { file_id: att.externalId });
+    if (!f.file_path) throw new ConnectorError("Telegram only lets bots download files up to 20 MB.", false);
+    const res = await providerFetch(`https://api.telegram.org/file/bot${ctx.tokens.accessToken}/${f.file_path}`, { label: "telegram file" });
+    if (!res.ok) throw new ConnectorError(`Couldn't download file (${res.status})`, false);
+    return { data: Buffer.from(await res.arrayBuffer()), mimeType: att.mimeType, name: att.name };
   },
 };

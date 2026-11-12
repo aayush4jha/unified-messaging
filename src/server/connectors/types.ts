@@ -76,8 +76,21 @@ export interface Page<T> {
   nextCursor?: string;
 }
 
+export interface OutboundFile {
+  name: string;
+  mimeType: string;
+  data: Buffer;
+}
+
+export interface DownloadedFile {
+  data: Buffer;
+  mimeType: string;
+  name: string;
+}
+
 export interface OutboundMessage {
   clientId: string;
+  attachments?: OutboundFile[];
   externalConversationId?: string;
   to: string[];
   cc?: string[];
@@ -103,6 +116,10 @@ export interface Connector {
   listMessages(ctx: ConnectorContext, externalConversationId: string, cursor?: string): Promise<Page<NormalizedMessage>>;
   send(ctx: ConnectorContext, msg: OutboundMessage): Promise<SendResult>;
   markRead?(ctx: ConnectorContext, externalConversationId: string): Promise<void>;
+  /** Fetches a received attachment from the provider (Orbit doesn't store file bytes). */
+  downloadAttachment?(ctx: ConnectorContext, messageExternalId: string, attachment: NormalizedAttachment): Promise<DownloadedFile>;
+  /** Per-file and total limits for outbound attachments (bytes). */
+  attachmentLimits?: { perFile: number; total: number };
   archive?(ctx: ConnectorContext, externalConversationId: string, archived: boolean): Promise<void>;
 }
 

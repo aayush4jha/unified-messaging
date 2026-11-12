@@ -131,3 +131,27 @@ describe("outlook (microsoft graph)", () => {
     expect(isPersonalMicrosoftAddress("me@contoso.com")).toBe(false);
   });
 });
+
+import { filenameParams } from "@/server/connectors/gmail";
+
+describe("gmail attachments (MIME)", () => {
+  it("builds multipart/mixed with base64 parts and RFC 2231 filenames", () => {
+    const raw = buildRawEmail({
+      from: "a@x.com",
+      to: ["b@y.com"],
+      subject: "Files",
+      body: "See attached",
+      boundary: "BOUNDARY",
+      attachments: [{ name: "Résumé (final).pdf", mimeType: "application/pdf", data: Buffer.from("%PDF-1.7 fake") }],
+    });
+    expect(raw).toContain('Content-Type: multipart/mixed; boundary="BOUNDARY"');
+    expect(raw).toContain("--BOUNDARY--");
+    expect(raw).toContain("filename*=UTF-8''R%C3%A9sum%C3%A9%20%28final%29.pdf");
+    const part = raw.split("--BOUNDARY")[2];
+    const b64 = part.split("\r\n\r\n")[1].replace(/\r\n/g, "");
+    expect(Buffer.from(b64, "base64").toString()).toBe("%PDF-1.7 fake");
+  });
+  it("escapes quotes in the ASCII filename fallback", () => {
+    expect(filenameParams('a"b.txt')).toMatch(/^filename="a_b\.txt"/);
+  });
+});

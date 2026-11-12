@@ -62,11 +62,24 @@ export const DemoTransport: Transport = {
 export const LiveTransport: Transport = {
   async send(req) {
     try {
-      const res = await fetch("/api/messages", {
-        method: "POST",
-        headers: { "content-type": "application/json", "idempotency-key": req.clientId },
-        body: JSON.stringify(req),
-      });
+      const { attachments, ...payload } = req;
+      let body: BodyInit;
+      const headers: Record<string, string> = { "idempotency-key": req.clientId };
+      if (attachments.length) {
+        // Files picked in the composer are kept as blob: URLs; turn them back into Blobs for upload.
+        const form = new FormData();
+        form.set("payload", JSON.stringify(payload));
+        for (const a of attachments) {
+          const blob = a.url ? await fetch(a.url).then((r) => r.blob()).catch(() => null) : null;
+          if (!blob) return { ok: false, error: `${a.name} is no longer available (files are kept only until the page reloads). Attach it again and resend.`, retryable: false };
+          form.append("file", blob, a.name);
+        }
+        body = form;
+      } else {
+        headers["content-type"] = "application/json";
+        body = JSON.stringify(payload);
+      }
+      const res = await fetch("/api/messages", { method: "POST", headers, body });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         return {

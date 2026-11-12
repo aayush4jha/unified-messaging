@@ -30,6 +30,7 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 - **Multiple accounts:** each Google account is its own `connected_accounts` row with its own encrypted refresh token, and you pick the sending account per message.
 - **Sync:** `threads.list` → `threads.get` (metadata + plain-text body), then incremental sync via `history.list` from the stored `historyId`. Push via `users.watch` → Pub/Sub is supported, and needs renewing every ≤7 days (handled by the cron job).
 - **Quota awareness:** after the 2026-05-01 quota change, `threads.get` costs 40 units (120 for full format). The connector requests `format=full` only for threads that are opened, and uses `metadata` for list sync.
+- **Attachments:** downloaded on demand with `messages.attachments.get`. Sending with attachments uses the multipart upload endpoint (up to 35 MB raw; Orbit caps at 25 MB) because the JSON endpoint is limited to 5 MB.
 - **Retention:** Google's policy forbids keeping cached copies longer than permitted. Orbit stores message bodies for the retention window set in Settings → Privacy (default 365 days, minimum 1). Deleting an account deletes all of its data.
 
 ### Outlook / Microsoft 365 (`src/server/connectors/outlook.ts`)
@@ -41,11 +42,13 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 - **Limits:** about 10,000 requests per 10 minutes per mailbox. 429s are retried after `Retry-After`. Change notifications (webhooks) are planned; for now the 5-minute cron catches new mail.
 
 ### Slack (`src/server/connectors/slack.ts`)
-- **User-token scopes:** `channels:history groups:history im:history mpim:history channels:read groups:read im:read mpim:read users:read chat:write`.
+- **User-token scopes:** `channels:history groups:history im:history mpim:history channels:read groups:read im:read mpim:read users:read chat:write files:read files:write` (+ the `*:write` conversation scopes for marking read).
+- **Files:** downloads use `files.info` → `url_private_download` with the user token; uploads use the v2 flow (`files.getUploadURLExternal` → upload → `files.completeUploadExternal`).
 - Messages are sent as **you** (user token). Thread replies keep `thread_ts`.
 - **Rate limits:** the connector honors `Retry-After` and schedules slow history backfill so the Marketplace throttle never fails a sync. Recent conversations are fetched first.
 
 ### Telegram Bot (`src/server/connectors/telegram.ts`)
+- Files: `sendDocument` for uploads (50 MB) and `getFile` for downloads (bots can download up to 20 MB).
 - Connect by pasting a bot token from @BotFather. Orbit validates it with `getMe` and registers a webhook with a secret token.
 - The inbox shows chats people start with the bot. Replies go out as the bot. The UI disables "New conversation" because bots can't start chats.
 

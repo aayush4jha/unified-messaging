@@ -168,21 +168,53 @@ export function encodeHeader(value: string): string {
   return /^[\x20-\x7E]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
 }
 
-/** Builds an RFC 5322 message (plain text, UTF-8) for messages.send. */
-export function buildRawEmail(msg: { from: string; to: string[]; cc?: string[]; subject: string; body: string; inReplyTo?: string; references?: string }): string {
-  const lines = [
+const wrap76 = (b64: string) => (b64.match(/.{1,76}/g) ?? [""]).join("\r\n");
+
+/** RFC 2231 filename parameter (UTF-8, percent-encoded) with an ASCII fallback. */
+export function filenameParams(name: string): string {
+  const ascii = name.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+  const encoded = encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
+/** Builds an RFC 5322 message (UTF-8 text, optional attachments as multipart/mixed). */
+export function buildRawEmail(msg: {
+  from: string;
+  to: string[];
+  cc?: string[];
+  subject: string;
+  body: string;
+  inReplyTo?: string;
+  references?: string;
+  attachments?: { name: string; mimeType: string; data: Buffer }[];
+  boundary?: string;
+}): string {
+  const headers = [
     `From: ${msg.from}`,
     `To: ${msg.to.join(", ")}`,
     ...(msg.cc?.length ? [`Cc: ${msg.cc.join(", ")}`] : []),
     `Subject: ${encodeHeader(msg.subject)}`,
     ...(msg.inReplyTo ? [`In-Reply-To: ${msg.inReplyTo}`, `References: ${[msg.references, msg.inReplyTo].filter(Boolean).join(" ")}`] : []),
     "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    (Buffer.from(msg.body, "utf8").toString("base64").match(/.{1,76}/g) ?? [""]).join("\r\n"),
   ];
-  return lines.join("\r\n");
+  const textPart = ['Content-Type: text/plain; charset="UTF-8"', "Content-Transfer-Encoding: base64", "", wrap76(Buffer.from(msg.body, "utf8").toString("base64"))];
+  if (!msg.attachments?.length) return [...headers, ...textPart].join("\r\n");
+
+  const boundary = msg.boundary ?? `orbit_${Buffer.from(String(Math.random())).toString("hex").slice(0, 24)}`;
+  const parts = [
+    [`--${boundary}`, ...textPart].join("\r\n"),
+    ...msg.attachments.map((a) =>
+      [
+        `--${boundary}`,
+        `Content-Type: ${a.mimeType || "application/octet-stream"}; name="${a.name.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, "_")}"`,
+        `Content-Disposition: attachment; ${filenameParams(a.name)}`,
+        "Content-Transfer-Encoding: base64",
+        "",
+        wrap76(a.data.toString("base64")),
+      ].join("\r\n"),
+    ),
+  ];
+  return [...headers, `Content-Type: multipart/mixed; boundary="${boundary}"`, "", ...parts, `--${boundary}--`, ""].join("\r\n");
 }
 
 /* ------------------------------------------------------------------ connector */
@@ -287,6 +319,8 @@ export const GmailConnector: Connector = {
     return { items: normalizeGmailThread(thread, ctx.accountHandle).messages ?? [] };
   },
 
+  attachmentLimits: { perFile: 25 * 1024 * 1024, total: 25 * 1024 * 1024 },
+
   async send(ctx, msg: OutboundMessage) {
     const raw = buildRawEmail({
       from: ctx.accountHandle,
@@ -296,10 +330,38 @@ export const GmailConnector: Connector = {
       body: msg.body,
       inReplyTo: msg.inReplyTo?.messageExternalId,
       references: msg.inReplyTo?.references,
+      attachments: msg.attachments,
     });
-    const res = await gmailFetch(ctx, "/messages/send", { method: "POST", body: JSON.stringify({ raw: encodeBase64Url(raw), threadId: msg.externalConversationId }) }, "messages.send");
-    const sent = await res.json();
+    let sent: { id: string; threadId: string };
+    if (msg.attachments?.length) {
+      // The JSON endpoint caps messages at 5 MB; the multipart upload endpoint allows up to 35 MB.
+      const tokens = await ensureFresh(ctx);
+      const boundary = `orbit_up_${Date.now().toString(36)}`;
+      const metadata = JSON.stringify(msg.externalConversationId ? { threadId: msg.externalConversationId } : {});
+      const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: message/rfc822\r\n\r\n`),
+        Buffer.from(raw),
+        Buffer.from(`\r\n--${boundary}--`),
+      ]);
+      const res = await providerFetch("https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart", {
+        label: "messages.send (upload)",
+        method: "POST",
+        headers: { authorization: `Bearer ${tokens.accessToken}`, "content-type": `multipart/related; boundary=${boundary}` },
+        body,
+      });
+      if (!res.ok) throw new ConnectorError(`Gmail send failed (${res.status})`, false);
+      sent = await res.json();
+    } else {
+      const res = await gmailFetch(ctx, "/messages/send", { method: "POST", body: JSON.stringify({ raw: encodeBase64Url(raw), threadId: msg.externalConversationId }) }, "messages.send");
+      sent = await res.json();
+    }
     return { externalMessageId: sent.id, externalConversationId: sent.threadId, sentAt: new Date().toISOString() };
+  },
+
+  async downloadAttachment(ctx, messageId, att) {
+    if (!att.externalId) throw new ConnectorError("This attachment can't be downloaded.", false);
+    const r = await (await gmailFetch(ctx, `/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.externalId)}`, {}, "attachments.get")).json();
+    return { data: Buffer.from(String(r.data), "base64url"), mimeType: att.mimeType, name: att.name };
   },
 
   async markRead(ctx, threadId) {

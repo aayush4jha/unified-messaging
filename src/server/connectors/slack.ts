@@ -31,6 +31,8 @@ export const SLACK_USER_SCOPES = [
   "mpim:read",
   "users:read",
   "chat:write",
+  "files:read",
+  "files:write",
   "channels:write",
   "groups:write",
   "im:write",
@@ -70,11 +72,12 @@ export function slackTsToIso(ts: string): string {
 
 /* ------------------------------------------------------------------ API */
 
-async function slackCall<T = Record<string, unknown>>(token: string, method: string, params: Record<string, string | number | undefined> = {}, post = false): Promise<T> {
-  const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]));
+async function slackCall<T = Record<string, unknown>>(token: string, method: string, params: Record<string, unknown> = {}, post = false): Promise<T> {
+  const defined = Object.entries(params).filter(([, v]) => v !== undefined);
+  // JSON bodies keep value types (e.g. `files` arrays); query strings are stringified.
   const res = post
-    ? await providerFetch(`${API}/${method}`, { label: `slack ${method}`, method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json; charset=utf-8" }, body: JSON.stringify(clean) })
-    : await providerFetch(`${API}/${method}?${new URLSearchParams(clean)}`, { label: `slack ${method}`, headers: { authorization: `Bearer ${token}` } });
+    ? await providerFetch(`${API}/${method}`, { label: `slack ${method}`, method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json; charset=utf-8" }, body: JSON.stringify(Object.fromEntries(defined)) })
+    : await providerFetch(`${API}/${method}?${new URLSearchParams(defined.map(([k, v]) => [k, String(v)]))}`, { label: `slack ${method}`, headers: { authorization: `Bearer ${token}` } });
   const data = (await res.json()) as { ok: boolean; error?: string } & T;
   if (!data.ok) {
     if (["invalid_auth", "token_revoked", "account_inactive", "not_authed", "token_expired"].includes(data.error ?? "")) throw new AuthError(`Slack: ${data.error}`);
@@ -197,8 +200,39 @@ export const SlackConnector: Connector = {
 
   async send(ctx, msg) {
     if (!msg.externalConversationId) throw new ConnectorError("Choose a Slack channel or person to message.", false);
+    if (msg.attachments?.length) {
+      // files.upload v2: reserve an upload URL per file, upload bytes, then share them with the message text.
+      const ids: { id: string; title: string }[] = [];
+      for (const f of msg.attachments) {
+        const slot = await slackCall<{ upload_url: string; file_id: string }>(ctx.tokens.accessToken, "files.getUploadURLExternal", { filename: f.name, length: f.data.length });
+        const up = await providerFetch(slot.upload_url, { label: "slack upload", method: "POST", body: new Uint8Array(f.data) });
+        if (!up.ok) throw new ConnectorError(`Slack upload failed (${up.status})`, true);
+        ids.push({ id: slot.file_id, title: f.name });
+      }
+      const done = await slackCall<{ files: { id: string; shares?: Record<string, Record<string, { ts: string }[]>> }[] }>(
+        ctx.tokens.accessToken,
+        "files.completeUploadExternal",
+        { files: ids, channel_id: msg.externalConversationId, initial_comment: msg.body, thread_ts: msg.inReplyTo?.messageExternalId },
+        true,
+      );
+      const share = Object.values(done.files[0]?.shares ?? {}).flatMap((byChannel) => byChannel[msg.externalConversationId!] ?? [])[0];
+      const ts = share?.ts ?? String(Date.now() / 1000);
+      return { externalMessageId: ts, externalConversationId: msg.externalConversationId, sentAt: slackTsToIso(ts) };
+    }
     const r = await slackCall<{ channel: string; ts: string }>(ctx.tokens.accessToken, "chat.postMessage", { channel: msg.externalConversationId, text: msg.body, thread_ts: msg.inReplyTo?.messageExternalId }, true);
     return { externalMessageId: r.ts, externalConversationId: r.channel, sentAt: slackTsToIso(r.ts) };
+  },
+
+  attachmentLimits: { perFile: 100 * 1024 * 1024, total: 200 * 1024 * 1024 },
+
+  async downloadAttachment(ctx, _messageId, att) {
+    if (!att.externalId) throw new ConnectorError("This file can't be downloaded.", false);
+    const info = await slackCall<{ file: { url_private_download?: string; url_private?: string; name: string; mimetype: string } }>(ctx.tokens.accessToken, "files.info", { file: att.externalId });
+    const url = info.file.url_private_download ?? info.file.url_private;
+    if (!url) throw new ConnectorError("Slack didn't return a download link for this file.", false);
+    const res = await providerFetch(url, { label: "slack file", headers: { authorization: `Bearer ${ctx.tokens.accessToken}` } });
+    if (!res.ok) throw new ConnectorError(`Couldn't download file (${res.status})`, false);
+    return { data: Buffer.from(await res.arrayBuffer()), mimeType: info.file.mimetype || att.mimeType, name: info.file.name || att.name };
   },
 
   async markRead(ctx, channel) {

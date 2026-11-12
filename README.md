@@ -48,7 +48,7 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 | WhatsApp, Instagram, Messenger, LinkedIn, Discord | Restricted by the platforms. Orbit explains why and links to the native app |
 
 Known gaps in live mode:
-- Sending attachments from live accounts isn't supported yet (receiving is).
+- Attachments: received files download through Orbit's authenticated proxy (Orbit doesn't store file bytes). Sending is limited per provider: Gmail 25 MB, Outlook 3 MB per file (larger files need Graph upload sessions, not built yet), Slack 100 MB, Telegram 50 MB. Your host's request-body limit also applies (Vercel functions: 4.5 MB).
 - Slack reactions and thread replies are shown, not editable.
 
 ## Documentation

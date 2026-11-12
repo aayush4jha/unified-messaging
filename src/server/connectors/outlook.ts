@@ -106,6 +106,20 @@ export function groupGraphConversations(messages: GraphMessage[], ownerEmail: st
     .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
 }
 
+/** Lists non-inline attachments for messages Graph flagged with hasAttachments. */
+async function attachAttachmentLists(ctx: ConnectorContext, messages: NormalizedMessage[]) {
+  for (const m of messages) {
+    if (!(m.metadata as { hasAttachments?: boolean } | undefined)?.hasAttachments) continue;
+    const r = await graph<{ value: { id: string; name: string; contentType: string; size: number; isInline?: boolean }[] }>(
+      ctx,
+      `/me/messages/${encodeURIComponent(m.externalId)}/attachments?$select=id,name,contentType,size,isInline`,
+      {},
+      "list attachments",
+    );
+    m.attachments = r.value.filter((a) => !a.isInline).map((a) => ({ externalId: a.id, name: a.name, mimeType: a.contentType, size: a.size }));
+  }
+}
+
 export function isPersonalMicrosoftAddress(email: string): boolean {
   return /@(outlook|hotmail|live|msn)\.[a-z.]+$/i.test(email);
 }
@@ -203,12 +217,27 @@ export const OutlookConnector: Connector = {
       all.push(...r.value);
       if (r["@odata.nextLink"]) next.push(r["@odata.nextLink"]);
     }
-    return { items: groupGraphConversations(all, ctx.accountHandle, inbox), nextCursor: next.length ? JSON.stringify(next) : undefined };
+    const items = groupGraphConversations(all, ctx.accountHandle, inbox);
+    await attachAttachmentLists(ctx, items.flatMap((c) => c.messages ?? []));
+    return { items, nextCursor: next.length ? JSON.stringify(next) : undefined };
   },
 
   async listMessages(ctx, conversationId) {
     const r = await graph<{ value: GraphMessage[] }>(ctx, `/me/messages?$top=100&$filter=conversationId eq '${conversationId.replace(/'/g, "''")}'&$select=${SELECT}`, {}, "conversation messages");
-    return { items: groupGraphConversations(r.value, ctx.accountHandle)[0]?.messages ?? [] };
+    const items = groupGraphConversations(r.value, ctx.accountHandle)[0]?.messages ?? [];
+    await attachAttachmentLists(ctx, items);
+    return { items };
+  },
+
+  // Simple attachment upload is limited to 3 MB per file (larger needs an upload session).
+  attachmentLimits: { perFile: 3 * 1024 * 1024, total: 20 * 1024 * 1024 },
+
+  async downloadAttachment(ctx, messageId, att) {
+    if (!att.externalId) throw new ConnectorError("This attachment can't be downloaded.", false);
+    const tokens = await ensureFresh(ctx);
+    const res = await providerFetch(`${GRAPH}/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.externalId)}/$value`, { label: "attachment", headers: { authorization: `Bearer ${tokens.accessToken}` } });
+    if (!res.ok) throw new ConnectorError(`Couldn't download attachment (${res.status})`, false);
+    return { data: Buffer.from(await res.arrayBuffer()), mimeType: att.mimeType, name: att.name };
   },
 
   async send(ctx, msg) {
@@ -223,6 +252,12 @@ export const OutlookConnector: Connector = {
           method: "POST",
           body: JSON.stringify({ subject: msg.subject ?? "", body: { contentType: "Text", content: msg.body }, toRecipients: recipients(msg.to), ccRecipients: recipients(msg.cc) }),
         }, "create draft");
+    for (const f of msg.attachments ?? []) {
+      await graph(ctx, `/me/messages/${encodeURIComponent(draft.id)}/attachments`, {
+        method: "POST",
+        body: JSON.stringify({ "@odata.type": "#microsoft.graph.fileAttachment", name: f.name, contentType: f.mimeType || "application/octet-stream", contentBytes: f.data.toString("base64") }),
+      }, "add attachment");
+    }
     await graph(ctx, `/me/messages/${encodeURIComponent(draft.id)}/send`, { method: "POST" }, "send");
     return { externalMessageId: draft.id, externalConversationId: draft.conversationId, sentAt: new Date().toISOString() };
   },
