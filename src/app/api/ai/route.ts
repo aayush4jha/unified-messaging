@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import * as z from "zod/v4";
 import { AIRefusalError, AIUnavailableError, AI_MODEL, aiConfigured, answerQuestion, suggestReplies, summarizeConversation, writeBriefing } from "@/server/ai";
 import { getSessionUser, supabaseConfigured } from "@/server/supabase";
@@ -48,6 +48,7 @@ const Body = z.discriminatedUnion("action", [
 ]);
 
 export async function GET() {
+  await connection();
   return NextResponse.json({ configured: aiConfigured(), model: aiConfigured() ? AI_MODEL : null });
 }
 

@@ -9,6 +9,7 @@ import { useUI } from "@/store/ui";
 import { useWorkspace } from "@/store/workspace";
 import { OrbitMark } from "../brand/platform-icon";
 import { Skeleton } from "../ui/empty";
+import { LiveBridge } from "../live/live-bridge";
 import { GlobalOverlays } from "./overlays";
 import { Sidebar } from "./sidebar";
 
@@ -34,6 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </Suspense>
       <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       <GlobalShortcuts />
+      <LiveBridge />
       <Suspense fallback={null}>
         <GlobalOverlays />
       </Suspense>

@@ -102,7 +102,9 @@ export function ruleAnswer(question: string, d: AssistantData): RuleAnswer {
     }
     case "waiting": {
       const waiting = followUps.filter((f) => f.type === "awaiting_them");
-      const tracked = d.reminders.filter((r) => r.kind === "awaiting_response" && !r.completedAt);
+      // Only reminders tied to conversations the assistant may read (AI-enabled accounts).
+      const allowedIds = new Set(convs.map((c) => c.id));
+      const tracked = d.reminders.filter((r) => r.kind === "awaiting_response" && !r.completedAt && r.conversationId && allowedIds.has(r.conversationId));
       const ids = Array.from(new Set([...waiting.map((w) => w.conversationId), ...tracked.map((t) => t.conversationId).filter(Boolean) as string[]]));
       if (!ids.length) return { text: "You're not waiting on anyone right now.", conversationIds: [] };
       return {
@@ -110,7 +112,7 @@ export function ruleAnswer(question: string, d: AssistantData): RuleAnswer {
           .map((id) => {
             const w = waiting.find((x) => x.conversationId === id);
             const t = tracked.find((x) => x.conversationId === id);
-            return `• ${byId(id) ? label(byId(id)) : t?.title}: ${w?.reason ?? t?.title ?? ""}`;
+            return `• ${label(byId(id))}: ${w?.reason ?? t?.title ?? ""}`;
           })
           .join("\n")}`,
         conversationIds: ids,

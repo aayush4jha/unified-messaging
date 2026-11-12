@@ -104,6 +104,8 @@ export interface WorkspaceState {
   setHydrated(): void;
   loadDemo(): void;
   resetWorkspace(): void;
+  hydrateLive(data: Pick<WorkspaceState, "accounts" | "conversations" | "labels" | "reminders" | "notes" | "notifications">): void;
+  setMessages(conversationId: string, messages: Message[]): void;
 
   /* conversations */
   patchConversation(id: string, patch: Partial<Conversation>): void;
@@ -230,6 +232,22 @@ export const useWorkspace = create<WorkspaceState>()(
           const data = createDemoData();
           set({ ...data, mode: "demo" });
         },
+
+        hydrateLive: (data) =>
+          set((s) => ({
+            ...data,
+            mode: "live",
+            // Keep already-loaded message lists for conversations that still exist.
+            messages: Object.fromEntries(Object.entries(s.mode === "live" ? s.messages : {}).filter(([id]) => data.conversations.some((c) => c.id === id))),
+            contacts: s.mode === "live" ? s.contacts : [],
+            drafts: s.mode === "live" ? s.drafts : [],
+            scheduled: s.mode === "live" ? s.scheduled : [],
+          })),
+        setMessages: (conversationId, messages) =>
+          set((s) => {
+            const pending = (s.messages[conversationId] ?? []).filter((m) => m.status === "pending" || m.status === "failed");
+            return { messages: { ...s.messages, [conversationId]: [...messages, ...pending.filter((p) => !messages.some((m) => m.clientId && m.clientId === p.clientId))] } };
+          }),
 
         resetWorkspace: () => {
           set({ ...emptyData(), mode: "empty", priorityRules: DEFAULT_PRIORITY_RULES, sidebar: DEFAULT_SIDEBAR });

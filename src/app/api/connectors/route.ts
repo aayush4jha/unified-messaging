@@ -1,15 +1,18 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { PLATFORMS, PLATFORM_ORDER } from "@/lib/platforms";
+import { aiConfigured } from "@/server/ai";
 
 /**
  * Which connectors this deployment can actually offer. Only reports whether
  * required env vars are present (never their values).
  */
 export async function GET() {
+  // Per-request: env can change between deploys/restarts.
+  await connection();
   const backend = {
     supabase: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY),
     encryption: !!process.env.ORBIT_TOKEN_ENCRYPTION_KEY,
-    ai: !!process.env.ANTHROPIC_API_KEY,
+    ai: aiConfigured(),
   };
   const connectors = PLATFORM_ORDER.map((id) => {
     const p = PLATFORMS[id];

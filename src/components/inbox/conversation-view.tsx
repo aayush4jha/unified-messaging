@@ -43,6 +43,7 @@ import { CustomDateTimeForm, SnoozeMenuItems, useConversationActions } from "./a
 import { ReplyComposer, type Prefill } from "./composer";
 import { ContactPanel } from "./contact-panel";
 import { ChatThread, EmailThread, JumpToLatest, ProfessionalThread, SlackThread } from "./messages";
+import { useEnsureMessages } from "../live/live-bridge";
 import { ReminderPopover } from "./reminder-popover";
 import { ConversationInsights } from "./insights";
 import type { ListRoute } from "./conversation-list";
@@ -59,6 +60,7 @@ export function ConversationView({ conversationId, route, className }: { convers
   const setPrefs = useWorkspace((s) => s.setPrefs);
   const markRead = useWorkspace((s) => s.markRead);
   const scrollRef = useRef<HTMLDivElement>(null);
+  useEnsureMessages(conversation);
   const [atBottom, setAtBottom] = useState(true);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
 

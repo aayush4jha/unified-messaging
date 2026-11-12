@@ -138,6 +138,7 @@ function AccountsSection() {
   const resetWorkspace = useWorkspace((s) => s.resetWorkspace);
   const [connectOpen, setConnectOpen] = useState(params.get("connect") === "1");
   const reconnectId = params.get("reconnect");
+  const oauthError = params.get("error");
   const platformFilter = params.get("platform");
   const shown = platformFilter ? accounts.filter((a) => a.platform === platformFilter) : accounts;
 
@@ -154,6 +155,15 @@ function AccountsSection() {
           </Button>
         }
       />
+
+      {oauthError ? (
+        <div className="mb-4 flex items-start gap-3 rounded-lg bg-danger-soft px-4 py-3 text-xs leading-[1.125rem] text-danger" role="alert">
+          <TriangleAlert className="mt-px size-4 shrink-0" />
+          <p className="flex-1">
+            <span className="font-medium">Couldn&apos;t connect the account.</span> {oauthError}
+          </p>
+        </div>
+      ) : null}
 
       {mode === "demo" ? (
         <div className="mb-4 flex items-start gap-3 rounded-lg border border-[color-mix(in_oklch,var(--warning)_30%,transparent)] bg-warning-soft px-4 py-3 text-xs leading-[1.125rem] text-fg-2">
