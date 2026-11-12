@@ -107,3 +107,27 @@ describe("contact identity matching", () => {
     expect(identityFor("gmail", "sub1", { externalId: "Rahul Mehta" })).toBeNull();
   });
 });
+
+import { groupGraphConversations, isPersonalMicrosoftAddress, type GraphMessage } from "@/server/connectors/outlook";
+
+describe("outlook (microsoft graph)", () => {
+  const owner = "alex@contoso.com";
+  const msgs: GraphMessage[] = [
+    { id: "a", conversationId: "C1", subject: "Budget review", from: { emailAddress: { name: "Nina", address: "Nina@Halcyon.com" } }, toRecipients: [{ emailAddress: { address: owner } }], receivedDateTime: "2026-11-10T09:00:00Z", isRead: false, body: { contentType: "text", content: "Can you review?\r\n\r\nOn Mon, Nov 9 Alex wrote:\r\n> old" }, parentFolderId: "INBOX", importance: "high" },
+    { id: "b", conversationId: "C1", subject: "RE: Budget review", from: { emailAddress: { name: "Alex", address: owner } }, toRecipients: [{ emailAddress: { address: "nina@halcyon.com" } }], sentDateTime: "2026-11-10T10:00:00Z", isRead: true, body: { contentType: "text", content: "Done." }, parentFolderId: "SENT" },
+    { id: "c", conversationId: "C2", subject: "Old thread", from: { emailAddress: { address: "x@y.com" } }, receivedDateTime: "2026-11-01T09:00:00Z", isRead: true, parentFolderId: "ARCHIVE", bodyPreview: "preview" },
+  ];
+  it("groups by conversation, newest first, with participants excluding the owner", () => {
+    const convs = groupGraphConversations(msgs, owner, "INBOX");
+    expect(convs.map((c) => c.externalId)).toEqual(["C1", "C2"]);
+    expect(convs[0]).toMatchObject({ title: "Budget review", unreadCount: 1, participants: [{ handle: "nina@halcyon.com" }], metadata: { archived: false, important: true } });
+    expect(convs[0].messages?.map((m) => [m.authorExternalId, m.body])).toEqual([["nina@halcyon.com", "Can you review?"], ["me", "Done."]]);
+    expect(convs[1].metadata).toMatchObject({ archived: true });
+    expect(convs[1].messages?.[0].body).toBe("preview");
+  });
+  it("labels personal Microsoft accounts", () => {
+    expect(isPersonalMicrosoftAddress("me@outlook.com")).toBe(true);
+    expect(isPersonalMicrosoftAddress("me@hotmail.co.uk")).toBe(true);
+    expect(isPersonalMicrosoftAddress("me@contoso.com")).toBe(false);
+  });
+});

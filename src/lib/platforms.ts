@@ -89,11 +89,11 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
     shortName: "Outlook",
     category: "email",
     color: "#0F6CBD",
-    support: "planned",
+    support: "live",
     authMethod: "Microsoft identity platform (OAuth 2.0) + Microsoft Graph",
-    summary: "Outlook.com and Microsoft 365 mail via Microsoft Graph.",
+    summary: "Outlook.com and Microsoft 365 mail via Microsoft Graph: read, reply, send, mark read and archive.",
     limitation:
-      "Connector not built yet. Microsoft Graph fully supports it (Mail.ReadWrite + Mail.Send, no admin consent needed), including personal Outlook.com accounts.",
+      "Uses delegated Mail.ReadWrite and Mail.Send (no admin consent needed). Some organizations only allow apps from verified publishers; if yours does, an admin has to approve Orbit.",
     capabilities: caps({
       read: true,
       send: true,
@@ -106,6 +106,7 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
       subjects: true,
       recipients: true,
       drafts: true,
+      schedule: true,
     }),
     requiredEnv: ["MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"],
     multiAccount: true,

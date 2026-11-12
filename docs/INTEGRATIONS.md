@@ -14,7 +14,7 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 | Gmail / Google Workspace | **Live** | Gmail API + Google OAuth | Feasible with restrictions | Read scopes are *restricted*: Google verification plus an annual CASA assessment before public launch. Until then: 100 test users, 7-day authorizations. Limited Use and caching rules apply. |
 | Slack | **Live** | Web API, OAuth v2 user token | Feasible with restrictions | Non-Marketplace apps get `conversations.history` at 1 request/min with 15 messages per call. Internal (self-hosted) apps are exempt. |
 | Telegram | **Live (Bot API)** | Bot API | Bot: inbox for chats with your bot | The Bot API can't read personal chats or start conversations. Personal chats need MTProto/TDLib (phone login, own `api_id`), which is planned. |
-| Outlook / Microsoft 365 | Planned | Microsoft Graph mail | Fully feasible | `Mail.Read` and `Mail.Send` need no admin consent and work for personal accounts. Publisher verification is recommended. |
+| Outlook / Microsoft 365 | **Live** | Microsoft Graph mail | Fully feasible | `Mail.ReadWrite` and `Mail.Send` need no admin consent and work for personal accounts. Publisher verification is recommended. |
 | IMAP / SMTP | Planned | IMAP4rev2 / SMTP, XOAUTH2 | Feasible with restrictions | Gmail and Microsoft require OAuth. App passwords work only where the provider still offers them. |
 | Microsoft Teams | Planned | Graph chats, delegated | Feasible with restrictions | Work/school accounts only. Polling once per day, so change notifications are needed (renewed every 3 days). |
 | WhatsApp | Restricted | Business Platform (Cloud API) | Not feasible for personal accounts | Business numbers only. Free-form replies within 24h, then paid templates. Coexistence requires Meta Tech Provider status. |
@@ -31,6 +31,14 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 - **Sync:** `threads.list` → `threads.get` (metadata + plain-text body), then incremental sync via `history.list` from the stored `historyId`. Push via `users.watch` → Pub/Sub is supported, and needs renewing every ≤7 days (handled by the cron job).
 - **Quota awareness:** after the 2026-05-01 quota change, `threads.get` costs 40 units (120 for full format). The connector requests `format=full` only for threads that are opened, and uses `metadata` for list sync.
 - **Retention:** Google's policy forbids keeping cached copies longer than permitted. Orbit stores message bodies for the retention window set in Settings → Privacy (default 365 days, minimum 1). Deleting an account deletes all of its data.
+
+### Outlook / Microsoft 365 (`src/server/connectors/outlook.ts`)
+- **Scopes (delegated):** `User.Read Mail.ReadWrite Mail.Send offline_access`. Works for Outlook.com and work/school accounts.
+- **Sync:** Inbox, Sent Items and Archive (last 60 days), grouped into conversations by `conversationId`. Bodies are requested as plain text (`Prefer: outlook.body-content-type="text"`).
+- **Replies** use `createReply` + `send`, so Graph returns real message and conversation ids (`sendMail` doesn't), which idempotent sends need. New messages go draft → send.
+- **Read / archive** are mirrored: `isRead` is patched, and archive moves messages between Inbox and the well-known Archive folder.
+- **Disconnect:** Microsoft has no per-app token revocation endpoint. Orbit deletes its stored tokens and data; users can remove the app at account.microsoft.com (or My Apps for work accounts).
+- **Limits:** about 10,000 requests per 10 minutes per mailbox. 429s are retried after `Retry-After`. Change notifications (webhooks) are planned; for now the 5-minute cron catches new mail.
 
 ### Slack (`src/server/connectors/slack.ts`)
 - **User-token scopes:** `channels:history groups:history im:history mpim:history channels:read groups:read im:read mpim:read users:read chat:write`.

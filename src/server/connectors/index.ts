@@ -1,5 +1,6 @@
 import type { PlatformId } from "@/lib/types";
 import { GmailConnector } from "./gmail";
+import { OutlookConnector } from "./outlook";
 import { SlackConnector } from "./slack";
 import { TelegramConnector } from "./telegram";
 import type { Connector } from "./types";
@@ -7,6 +8,7 @@ import type { Connector } from "./types";
 /** Implemented connectors. Platforms not listed here are planned or restricted (see src/lib/platforms.ts). */
 export const CONNECTORS: Partial<Record<PlatformId, Connector>> = {
   gmail: GmailConnector,
+  outlook: OutlookConnector,
   slack: SlackConnector,
   telegram: TelegramConnector,
 };
