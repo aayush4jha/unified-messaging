@@ -41,8 +41,28 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
    - **Other email (IMAP)**: no app setup. In Settings, pick the provider and paste an app-specific password.
    - **Telegram**: no app setup. Paste a bot token from @BotFather in Settings → Accounts.
 4. **Real time.** Run `0004_realtime.sql` so the inbox updates live via Supabase Realtime. With `ORBIT_PUBLIC_URL` set, Orbit also registers provider push: Outlook change notifications automatically, Gmail via Pub/Sub (see `.env.example`), and Slack/Telegram webhooks.
-5. **Background sync.** [`vercel.json`](vercel.json) schedules `/api/cron/sync` every 5 minutes (set `CRON_SECRET`). On other hosts, call it with `Authorization: Bearer $CRON_SECRET`.
-6. **AI (optional).** Set `ANTHROPIC_API_KEY`. Without it, briefings and assistant answers use Orbit's rules and say so.
+5. **Background sync.** [`vercel.json`](vercel.json) schedules `/api/cron/sync` once a day, the most Vercel's free Hobby plan allows (set `CRON_SECRET`). Provider push and webhooks deliver new messages in real time regardless. For a sync every 5 minutes, use Vercel Pro (change the schedule to `*/5 * * * *`) or any free external scheduler (for example cron-job.org) calling `GET /api/cron/sync` with `Authorization: Bearer $CRON_SECRET`.
+6. **Push to phones (optional).** Generate VAPID keys (`npx web-push generate-vapid-keys`), set them as described in `.env.example`, and run `0008_push_subscriptions.sql`. See [docs/MOBILE.md](docs/MOBILE.md).
+7. **AI (optional).** Set `ANTHROPIC_API_KEY`. Without it, briefings and assistant answers use Orbit's rules and say so.
+
+## Mobile apps
+
+One codebase installs on every device. Share **`/download`**: it detects the device and shows the right install path.
+
+- **Android:** a signed APK (about 1.3 MB) built from the web app with Google's Bubblewrap (`scripts/build-android.sh <domain>`), or Chrome's "Install app".
+- **iPhone/iPad:** Add to Home Screen. Apple allows no free file-based installs.
+- **Desktop:** the browser's install option.
+
+The installed apps include:
+- push notifications
+- offline access with queued edits
+- an app-icon badge
+- home-screen shortcuts
+- Share → Orbit
+- phone gestures: swipe to archive or toggle read, pull to refresh
+- a bottom tab bar
+
+Web deploys update every installed app, with no new download. Details, signing-key backup and the Play Store / App Store paths are in [docs/MOBILE.md](docs/MOBILE.md).
 
 ## Scripts
 
@@ -53,6 +73,8 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 | `npm test` | Unit tests (search, prioritization, follow-ups, analytics, crypto, OAuth state, Gmail/Slack/Telegram parsing) |
 | `npm run test:e2e` | Playwright end-to-end journeys plus an axe-core WCAG 2.1 AA audit of every main screen, both themes |
 | `npm run typecheck` / `npm run lint` | TypeScript / ESLint |
+| `scripts/build-android.sh <domain>` | Builds and publishes the Android APK for a deployed domain ([docs/MOBILE.md](docs/MOBILE.md)) |
+| `node scripts/generate-icons.mjs` | Regenerates app icons, maskable icons, badges and shortcut icons |
 
 ## Status
 
@@ -74,7 +96,8 @@ Known gaps in live mode:
 
 - [Architecture](docs/ARCHITECTURE.md): structure, connector model, sending guarantees, sync, security, schema
 - [Integrations](docs/INTEGRATIONS.md): what each platform's official API allows, and the alternatives
-- [Design system](docs/DESIGN_SYSTEM.md): tokens, typography, motion, interaction principles
+- [Design system](docs/DESIGN_SYSTEM.md): tokens, typography, motion, interaction principles, phone patterns
+- [Mobile apps](docs/MOBILE.md): Android APK, iPhone Home Screen app, push notifications, offline
 - [API research (Nov 2026)](docs/research/api-landscape-2026-11.md): sourced findings for every platform
 
 ## Stack

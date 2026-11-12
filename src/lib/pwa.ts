@@ -3,7 +3,7 @@
  * that installs three ways: Android (APK or "Install app"), iOS ("Add to Home
  * Screen"), and desktop browsers. See docs/MOBILE.md.
  */
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 export type DevicePlatform = "ios" | "android" | "desktop";
 
@@ -111,3 +111,33 @@ function readDeviceCached() {
 
 /** Where the Android APK is published (same origin, so the share link is just /download). */
 export const ANDROID_APK_PATH = "/downloads/orbit.apk";
+
+/** Written next to the APK by scripts/build-android.sh. */
+export interface ApkInfo {
+  version: string;
+  versionCode: number;
+  packageId: string;
+  sizeBytes: number;
+  sha256: string;
+  builtAt: string;
+}
+
+let apkInfo: Promise<ApkInfo | null> | null = null;
+export function fetchApkInfo(): Promise<ApkInfo | null> {
+  return (apkInfo ??= fetch("/downloads/android.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? (r.json() as Promise<ApkInfo>) : null))
+    .catch(() => null));
+}
+
+/** The published Android build, `null` when this deployment has none, `undefined` while loading. */
+export function useApkInfo(): ApkInfo | null | undefined {
+  const [info, setInfo] = useState<ApkInfo | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void fetchApkInfo().then((i) => alive && setInfo(i));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return info;
+}

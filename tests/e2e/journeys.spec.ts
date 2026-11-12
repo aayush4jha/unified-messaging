@@ -180,3 +180,9 @@ test("create a task from a single message", async ({ page }) => {
   await page.goto("/follow-ups?tab=upcoming");
   await expect(page.getByText(/Hi Alex, Nina here/).first()).toBeVisible();
 });
+
+test("download page: desktop visitors get a QR code for their phone", async ({ page }) => {
+  await page.goto("/download");
+  await expect(page.getByRole("img", { name: /QR code for http.*\/download/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "All devices" })).toBeVisible();
+});

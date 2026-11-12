@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type Page } from "@playwright/test";
 import { row, startSample } from "./helpers";
 
 /** A real touch drag (Chromium touch emulation), so pointer events arrive as pointerType "touch". */
@@ -93,7 +93,9 @@ test("mobile: Settings → Mobile app offers the Android download and push statu
   await startSample(page);
   await page.goto("/settings?tab=mobile");
   await expect(page.getByRole("heading", { name: "Mobile app" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Download Orbit\.apk/ })).toHaveAttribute("href", "/downloads/orbit.apk");
+  const apk = await page.request.get("/downloads/android.json");
+  if (apk.ok()) await expect(page.getByRole("link", { name: /Download Orbit\.apk/ })).toHaveAttribute("href", "/downloads/orbit.apk");
+  else await expect(page.getByText(/tap Install app/)).toBeVisible();
   await expect(page.getByText(/Sign in to your Orbit account to get notifications/)).toBeVisible();
 });
 
@@ -111,3 +113,20 @@ for (const [name, path] of [
     expect(serious, serious.map((v) => `${v.id}: ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(", ")}`).join("\n")).toEqual([]);
   });
 }
+
+test("mobile: /download shows the Android install path", async ({ page }) => {
+  await page.goto("/download");
+  await expect(page.getByRole("heading", { name: "Every conversation. One app." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Install on your Android phone" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("iPhone visitors get Add to Home Screen steps on /download", async ({ browser }) => {
+  const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+  const page = await ctx.newPage();
+  await page.goto("/download");
+  await expect(page.getByRole("heading", { name: "Install on your iPhone or iPad" })).toBeVisible();
+  await expect(page.getByText("Add to Home Screen").first()).toBeVisible();
+  await ctx.close();
+});

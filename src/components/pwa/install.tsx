@@ -1,10 +1,10 @@
 "use client";
 
-import { Check, Copy, Download, ExternalLink, MoreHorizontal, Share, Smartphone, SquarePlus, X } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, MoreHorizontal, MoreVertical, Share, Smartphone, SquarePlus, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ANDROID_APK_PATH, useDevice, useInstallPrompt, type DeviceInfo } from "@/lib/pwa";
+import { ANDROID_APK_PATH, useApkInfo, useDevice, useInstallPrompt, type DeviceInfo } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
 import { OrbitMark } from "../brand/platform-icon";
 import { Button, IconButton } from "../ui/button";
@@ -135,15 +135,7 @@ export function InstallSteps({ onDone, forPlatform }: { onDone?: () => void; for
     return (
       <div className="space-y-4">
         {nativeInstall}
-        <div className={cn("rounded-md border border-line p-3", nativeInstall && "bg-surface-sunken")}>
-          <p className="text-[0.8125rem] font-medium text-fg">{nativeInstall ? "Or download the Android app" : "Download the Android app"}</p>
-          <p className="mt-0.5 text-xs text-fg-3">Open the file when it finishes downloading. If Android asks, allow installs from your browser, then tap Install.</p>
-          <Button asChild size="md" className="mt-2.5 w-full" variant={nativeInstall ? "secondary" : "primary"}>
-            <a href={ANDROID_APK_PATH} download="Orbit.apk">
-              <Download /> Download Orbit.apk
-            </a>
-          </Button>
-        </div>
+        <AndroidApk secondary={!!nativeInstall} />
       </div>
     );
   }
@@ -160,7 +152,37 @@ export function InstallSteps({ onDone, forPlatform }: { onDone?: () => void; for
   );
 }
 
-function Steps({ steps }: { steps: { icon: React.ReactNode; text: React.ReactNode }[] }) {
+function AndroidApk({ secondary }: { secondary: boolean }) {
+  const apk = useApkInfo();
+  if (apk === undefined) return <div className="h-[132px] rounded-md border border-line" aria-busy="true" />;
+  if (apk === null) {
+    return (
+      <Steps
+        steps={[
+          { icon: <MoreVertical />, text: <>Open your browser menu <b>⋮</b> and tap <b>Install app</b> (or <b>Add to Home screen</b>).</> },
+          { icon: <Smartphone />, text: <>Open Orbit from your home screen or app drawer.</> },
+        ]}
+      />
+    );
+  }
+  return (
+    <div className={cn("rounded-md border border-line p-3", secondary && "bg-surface-sunken")}>
+      <p className="text-[0.8125rem] font-medium text-fg">{secondary ? "Or download the Android app" : "Download the Android app"}</p>
+      <p className="mt-0.5 text-xs text-fg-3">Open the file when it finishes downloading. If Android asks, allow installs from your browser, then tap Install.</p>
+      <Button asChild size="md" className="mt-2.5 w-full" variant={secondary ? "secondary" : "primary"}>
+        <a href={ANDROID_APK_PATH} download="Orbit.apk">
+          <Download /> Download Orbit.apk <span className="font-normal opacity-80">· {formatBytes(apk.sizeBytes)}</span>
+        </a>
+      </Button>
+    </div>
+  );
+}
+
+export function formatBytes(n: number) {
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`;
+}
+
+export function Steps({ steps }: { steps: { icon: React.ReactNode; text: React.ReactNode }[] }) {
   return (
     <ol className="space-y-3">
       {steps.map((s, i) => (
