@@ -305,6 +305,7 @@ function HeatRow({ day, cells, max }: { day: string; cells: number[]; max: numbe
             key={h}
             className={cn("group relative h-[14px] rounded-[3px]")}
             style={{ background: `var(--seq-${step})` }}
+            role="img"
             aria-label={`${day} ${h}:00, ${count} messages`}
           >
             <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-fg px-2 py-1 text-[0.6875rem] text-fg-inverse shadow-md group-hover:block">

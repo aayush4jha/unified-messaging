@@ -264,7 +264,7 @@ export function ChatThread({ conversation: c, messages }: ThreadProps) {
                     </div>
                   ) : null}
                   {m.body && m.body !== "📷 Photo" ? <span className="whitespace-pre-wrap break-words">{m.body}</span> : null}
-                  <span className={cn("ml-2 inline-flex translate-y-[3px] items-center gap-0.5 whitespace-nowrap text-[0.625rem] float-right", a.isMe ? "text-accent-contrast/70 [&_svg]:!text-current" : "text-fg-3")}>
+                  <span className={cn("ml-2 inline-flex translate-y-[3px] items-center gap-0.5 whitespace-nowrap text-[0.625rem] float-right", a.isMe ? "text-accent-contrast [&_svg]:!text-current" : "text-fg-3")}>
                     {new Date(m.sentAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                     {a.isMe && m.status !== "pending" && m.status !== "failed" ? <DeliveryStatus message={m} platform={c.platform} /> : null}
                   </span>

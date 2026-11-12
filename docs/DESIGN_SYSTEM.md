@@ -23,6 +23,19 @@ All tokens live in `src/app/globals.css` and are exposed to Tailwind via `@theme
 | Radius | `xs 4` · `sm 6` (controls) · `md 8` (menus) · `lg 12` (dialogs) · `xl 16` |
 | Density | `--row-py`, `--nav-h`, `--msg-gap` swap under `[data-density="compact"]` |
 
+### Contrast guarantees
+
+All text tokens meet WCAG AA (≥ 4.5:1) against **every** surface they can sit on, including hover, active and selected rows, in both themes. The values were computed in OKLCH and checked by the automated axe suite (`tests/e2e/a11y.spec.ts`), which fails the build on any serious or critical WCAG 2.1 A/AA violation across all main screens in light and dark mode.
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| `fg-3` (meta) | L 0.49 → ≥ 5.1:1 | L 0.70 → ≥ 5.9:1 |
+| `fg-4` (quiet labels, placeholders) | L 0.52 → ≥ 4.5:1 | L 0.645 → ≥ 4.8:1 |
+| White on `accent` (Send, outgoing bubbles) | 4.8:1 | dark text, 5.8:1 |
+| `success` / `info` / `danger` text on their soft fills | ≥ 4.5:1 | ≥ 4.5:1 |
+
+Semantics: conversation lists are plain `list`/`listitem` (rows contain real links and buttons, so there's no `option` role with nested controls). Filters are toggle buttons (`aria-pressed`), the open conversation is marked `aria-current`, decorative platform icons are hidden from assistive tech, and the platform and unread state are announced as screen-reader text.
+
 ## Typography
 
 Geist Sans / Geist Mono. The base UI size is **13px** (`text-sm`), set for dense, scannable lists.

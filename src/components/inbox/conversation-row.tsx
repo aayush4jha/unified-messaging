@@ -62,8 +62,7 @@ export const ConversationRow = memo(function ConversationRow({
 
   return (
     <div
-      role="option"
-      aria-selected={selected}
+      role="listitem"
       data-conversation-id={c.id}
       className={cn(
         "group/row relative border-b border-line-subtle transition-colors duration-100",
@@ -82,7 +81,7 @@ export const ConversationRow = memo(function ConversationRow({
           }
         }}
         className="flex gap-3 px-4 py-[var(--row-py)] outline-none focus-visible:bg-hover"
-        aria-label={`${displayName(c)}, ${platform.name} ${account?.label ?? ""}, ${unread ? "unread, " : ""}${c.title}`}
+        aria-current={selected ? "true" : undefined}
       >
         <div className="relative pt-0.5" style={{ "--avatar-ring": selected ? "var(--selected)" : checked ? "var(--surface)" : "var(--surface)" } as React.CSSProperties}>
           <span className={cn("block transition-opacity duration-100", checked && "opacity-0")}>
@@ -91,6 +90,12 @@ export const ConversationRow = memo(function ConversationRow({
         </div>
 
         <div className="min-w-0 flex-1">
+          <span className="sr-only">
+            {platform.name}
+            {unread ? ", unread" : ""}
+            {c.priority === "high" ? ", high priority" : ""}
+            {": "}
+          </span>
           {/* Line 1 */}
           <div className="flex items-center gap-1.5">
             {unread ? <span className="size-[7px] shrink-0 rounded-full bg-accent" aria-hidden /> : null}

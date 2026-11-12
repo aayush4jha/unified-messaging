@@ -32,27 +32,29 @@
   /* Text */
   --text: oklch(0.215 0.006 80);
   --text-2: oklch(0.44 0.007 80);
-  --text-3: oklch(0.57 0.007 80);
-  --text-4: oklch(0.68 0.006 80);
+  /* fg-3 / fg-4 are tuned to stay >= 4.5:1 on every light surface (WCAG AA body text). */
+  --text-3: oklch(0.49 0.007 80);
+  --text-4: oklch(0.52 0.006 80);
   --text-inverse: oklch(0.985 0.002 80);
 
   /* Accent (overridden by [data-accent]) */
-  --accent: oklch(0.585 0.185 33);
-  --accent-hover: oklch(0.54 0.18 33);
+  /* 0.565 keeps white text on the accent >= 4.5:1 */
+  --accent: oklch(0.565 0.185 33);
+  --accent-hover: oklch(0.52 0.18 33);
   --accent-text: oklch(0.5 0.16 33);
-  --accent-soft: oklch(0.585 0.185 33 / 0.1);
-  --accent-soft-2: oklch(0.585 0.185 33 / 0.16);
+  --accent-soft: oklch(0.565 0.185 33 / 0.1);
+  --accent-soft-2: oklch(0.565 0.185 33 / 0.16);
   --accent-contrast: oklch(0.99 0.005 33);
 
   /* Semantic */
-  --success: oklch(0.56 0.12 155);
-  --success-soft: oklch(0.56 0.12 155 / 0.12);
+  --success: oklch(0.48 0.12 155);
+  --success-soft: oklch(0.48 0.12 155 / 0.12);
   --warning: oklch(0.66 0.14 70);
   --warning-soft: oklch(0.72 0.14 75 / 0.16);
-  --danger: oklch(0.56 0.2 25);
-  --danger-soft: oklch(0.56 0.2 25 / 0.1);
-  --info: oklch(0.55 0.1 240);
-  --info-soft: oklch(0.55 0.1 240 / 0.12);
+  --danger: oklch(0.52 0.2 25);
+  --danger-soft: oklch(0.52 0.2 25 / 0.1);
+  --info: oklch(0.5 0.1 240);
+  --info-soft: oklch(0.5 0.1 240 / 0.12);
 
   /* Chat bubbles */
   --bubble-in: oklch(0.962 0.004 80);
@@ -109,9 +111,10 @@
   --border-strong: oklch(0.32 0.005 75);
 
   --text: oklch(0.948 0.003 80);
-  --text-2: oklch(0.76 0.005 80);
-  --text-3: oklch(0.6 0.005 80);
-  --text-4: oklch(0.48 0.005 80);
+  /* >= 4.5:1 on every dark surface, including hover/active. */
+  --text-2: oklch(0.8 0.005 80);
+  --text-3: oklch(0.7 0.005 80);
+  --text-4: oklch(0.645 0.005 80);
   --text-inverse: oklch(0.17 0.003 75);
 
   --accent: oklch(0.66 0.175 36);

@@ -198,12 +198,11 @@ export function ConversationList({ route, className }: { route: ListRoute; class
 
         {/* Filters */}
         {isConvFolder ? (
-          <div className="flex items-center gap-1 overflow-x-auto px-3 pb-2.5 pl-4 scrollbar-none [mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)]" role="tablist" aria-label="Filters">
+          <div className="flex items-center gap-1 overflow-x-auto px-3 pb-2.5 pl-4 scrollbar-none [mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)]" role="group" aria-label="Filters">
             {FILTERS.map((f) => (
               <button
                 key={f.id}
-                role="tab"
-                aria-selected={filter === f.id}
+                aria-pressed={filter === f.id}
                 onClick={() => setFilter(f.id)}
                 className={cn(
                   "h-6 shrink-0 rounded-full px-2.5 text-xs font-medium transition-colors",
@@ -335,7 +334,7 @@ export function ConversationList({ route, className }: { route: ListRoute; class
       ) : null}
 
       {/* Body */}
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin" role={isConvFolder ? "listbox" : undefined} aria-label={title}>
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin" role={isConvFolder ? "list" : undefined} aria-label={title}>
         {route.folder === "drafts" && !route.accountId && !route.labelId ? (
           <DraftsList />
         ) : route.folder === "scheduled" && !route.accountId && !route.labelId ? (
