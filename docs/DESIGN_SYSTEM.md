@@ -68,4 +68,17 @@ Three panels at ≥1280px: sidebar (244px, collapsible to a 52px rail) · conver
 
 - 1024–1280px: the contact panel becomes an overlay.
 - 768–1024px: list and conversation are stacked views with a back action.
-- <768px: the sidebar becomes a drawer, and touch targets are ≥36px.
+- <768px: the sidebar becomes a drawer behind **More**, and a bottom tab bar (Inbox · Search · Compose · Follow-ups · More) puts the main actions within thumb reach. The bar hides inside a conversation or contact, where the composer and back gesture own the bottom of the screen.
+
+## Phones and installed apps
+
+Orbit installs as an app on Android (APK or "Install app"), iPhone/iPad (Add to Home Screen) and desktop. See `docs/MOBILE.md`.
+
+- **Edge to edge.** `viewport-fit=cover`: the `app-frame` utility pads for the notch and status bar, and bottom bars pad for the home indicator (`pb-safe`).
+- **Touch targets.** On touch screens (`pointer-coarse`), icon buttons grow to 32–40px and buttons to 32–44px without changing desktop density. Text inputs are 16px so iOS doesn't zoom in on focus.
+- **Gestures** (touch only; mouse and keyboard behavior is unchanged):
+  - Swipe a conversation left to archive (it flies out, with Undo) and right to toggle read. The action is revealed under the row and turns solid at the commit threshold, with a light haptic on Android.
+  - Pull down at the top of the inbox to refresh.
+  - Swipe from the left edge to go back (installed iPhone app, which has no system back gesture).
+- **Menus.** Phone headers keep three actions and move the rest into ⋯. Options that would open a side-by-side submenu are listed inline on phones.
+- **Offline.** A banner explains the state, and edits are kept and synced when the connection returns.

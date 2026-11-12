@@ -65,6 +65,8 @@ export function LiveBridge() {
       void refresh(false);
     };
     window.addEventListener("online", onOnline);
+    const onManualRefresh = () => void refresh(false);
+    window.addEventListener("orbit:refresh", onManualRefresh);
 
     return () => {
       alive = false;
@@ -73,6 +75,7 @@ export function LiveBridge() {
       unsub();
       document.removeEventListener("visibilitychange", flushOnHide);
       window.removeEventListener("online", onOnline);
+      window.removeEventListener("orbit:refresh", onManualRefresh);
       void outbox.flush();
     };
   }, []);

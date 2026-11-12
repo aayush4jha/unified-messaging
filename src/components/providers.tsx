@@ -47,6 +47,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         position="bottom-center"
         gap={8}
         offset={20}
+        // Phones: above the bottom tab bar and the home indicator.
+        mobileOffset={{ bottom: "calc(env(safe-area-inset-bottom) + 72px)", left: 12, right: 12 }}
         toastOptions={{
           classNames: {
             toast:

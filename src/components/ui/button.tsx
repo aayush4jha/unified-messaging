@@ -20,10 +20,11 @@ export const buttonVariants = cva(
         link: "text-accent-text hover:underline underline-offset-2 px-0 h-auto",
       },
       size: {
-        xs: "h-6 px-2 text-xs rounded-[5px] [&_svg]:size-3.5",
-        sm: "h-7 px-2.5 text-[0.8125rem] rounded-sm [&_svg]:size-3.5",
-        md: "h-8 px-3 text-[0.8125rem] rounded-sm [&_svg]:size-4",
-        lg: "h-10 px-4 text-sm rounded-md [&_svg]:size-4",
+        // Touch screens get taller hit targets (pointer-coarse) without changing the desktop density.
+        xs: "h-6 px-2 text-xs rounded-[5px] [&_svg]:size-3.5 pointer-coarse:h-8",
+        sm: "h-7 px-2.5 text-[0.8125rem] rounded-sm [&_svg]:size-3.5 pointer-coarse:h-9",
+        md: "h-8 px-3 text-[0.8125rem] rounded-sm [&_svg]:size-4 pointer-coarse:h-10",
+        lg: "h-10 px-4 text-sm rounded-md [&_svg]:size-4 pointer-coarse:h-11",
       },
     },
     defaultVariants: { variant: "secondary", size: "md" },
@@ -68,9 +69,9 @@ const iconButtonVariants = cva(
   {
     variants: {
       size: {
-        xs: "size-6 rounded-[5px] [&_svg]:size-3.5",
-        sm: "size-7 rounded-sm [&_svg]:size-4",
-        md: "size-8 rounded-sm [&_svg]:size-[1.0625rem]",
+        xs: "size-6 rounded-[5px] [&_svg]:size-3.5 pointer-coarse:size-8",
+        sm: "size-7 rounded-sm [&_svg]:size-4 pointer-coarse:size-10 pointer-coarse:[&_svg]:size-[1.125rem]",
+        md: "size-8 rounded-sm [&_svg]:size-[1.0625rem] pointer-coarse:size-10",
       },
     },
     defaultVariants: { size: "sm" },

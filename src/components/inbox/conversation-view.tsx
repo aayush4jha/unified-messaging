@@ -37,12 +37,14 @@ import { Avatar } from "../ui/avatar";
 import { IconButton } from "../ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/controls";
 import { EmptyState } from "../ui/empty";
-import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from "../ui/menu";
+import { Menu, MenuCheckboxItem, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from "../ui/menu";
 import { Tooltip } from "../ui/tooltip";
 import { CustomDateTimeForm, SnoozeMenuItems, useConversationActions } from "./actions";
 import { ReplyComposer, type Prefill } from "./composer";
 import { ContactPanel } from "./contact-panel";
 import { ChatThread, EmailThread, JumpToLatest, ProfessionalThread, SlackThread } from "./messages";
+import { useEdgeSwipeBack } from "@/lib/gestures";
+import { useDevice } from "@/lib/pwa";
 import { useEnsureMessages } from "../live/live-bridge";
 import { ReminderPopover } from "./reminder-popover";
 import { ConversationInsights } from "./insights";
@@ -87,6 +89,9 @@ export function ConversationView({ conversationId, route, className }: { convers
   }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const backHref = inboxHref({ folder: route.folder, account: route.accountId, label: route.labelId });
+  const sectionRef = useRef<HTMLElement>(null);
+  const device = useDevice();
+  useEdgeSwipeBack(sectionRef, () => router.push(backHref), device?.platform === "ios" && device.standalone);
 
   if (!conversation) {
     return (
@@ -109,7 +114,7 @@ export function ConversationView({ conversationId, route, className }: { convers
 
   return (
     <div className={cn("flex min-w-0 flex-1", className)}>
-      <section aria-label="Conversation" className="flex min-w-0 flex-1 flex-col bg-bg">
+      <section ref={sectionRef} aria-label="Conversation" className="flex min-w-0 flex-1 flex-col bg-bg">
         <ConversationHeader conversation={conversation} backHref={backHref} route={route} panelOpen={panelOpen} onTogglePanel={() => setPrefs({ contactPanelOpen: !panelOpen })} onRemoved={() => router.replace(backHref, { scroll: false })} />
         <div className="relative min-h-0 flex-1">
           <div
@@ -219,110 +224,119 @@ function ConversationHeader({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5">
-        <IconButton label={c.starred ? "Unstar" : "Star"} shortcut="S" onClick={() => actions.toggleStar(c)} active={c.starred}>
-          <Star className={cn(c.starred && "fill-[var(--warning)] text-[var(--warning)]")} />
-        </IconButton>
-        <IconButton label={c.archived ? "Move to inbox" : "Archive"} shortcut="E" onClick={() => actions.archive(c, { onDone: afterRemove })}>
-          {c.archived ? <ArchiveRestore /> : <Archive />}
-        </IconButton>
-        <Popover open={customSnooze} onOpenChange={setCustomSnooze}>
-          <PopoverAnchor asChild>
-            <span>
-              <Menu open={snoozeOpen} onOpenChange={setSnoozeOpen}>
-                <MenuTrigger asChild>
-                  <IconButton label="Snooze" shortcut="H" active={!!c.snoozedUntil}>
-                    <Clock />
-                  </IconButton>
-                </MenuTrigger>
-                <MenuContent align="end" className="w-64">
+      <Popover open={customSnooze} onOpenChange={setCustomSnooze}>
+        <PopoverAnchor asChild>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {/* Phones keep Archive, Remind and ⋯ in the header; Star and Snooze move into ⋯. */}
+            <IconButton label={c.starred ? "Unstar" : "Star"} shortcut="S" onClick={() => actions.toggleStar(c)} active={c.starred} className="hidden sm:inline-flex">
+              <Star className={cn(c.starred && "fill-[var(--warning)] text-[var(--warning)]")} />
+            </IconButton>
+            <IconButton label={c.archived ? "Move to inbox" : "Archive"} shortcut="E" onClick={() => actions.archive(c, { onDone: afterRemove })}>
+              {c.archived ? <ArchiveRestore /> : <Archive />}
+            </IconButton>
+            <Menu open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+              <MenuTrigger asChild>
+                <IconButton label="Snooze" shortcut="H" active={!!c.snoozedUntil} className="hidden sm:inline-flex">
+                  <Clock />
+                </IconButton>
+              </MenuTrigger>
+              <MenuContent align="end" className="w-64">
+                <MenuLabel>Snooze until</MenuLabel>
+                <SnoozeMenuItems conversation={c} onDone={afterRemove} onCustom={() => setTimeout(() => setCustomSnooze(true), 0)} />
+              </MenuContent>
+            </Menu>
+            <ReminderPopover conversation={c} open={reminderOpen} onOpenChange={setReminderOpen}>
+              <IconButton label="Remind me / follow up" shortcut="M">
+                <Bell />
+              </IconButton>
+            </ReminderPopover>
+            <Menu>
+              <MenuTrigger asChild>
+                <IconButton label="More actions">
+                  <MoreHorizontal />
+                </IconButton>
+              </MenuTrigger>
+              <MenuContent align="end" className="w-60">
+                <MenuItem onSelect={() => actions.toggleStar(c)} shortcut="S" className="sm:hidden">
+                  <Star /> {c.starred ? "Unstar" : "Star"}
+                </MenuItem>
+                {/* Phones: snooze options inline (side-by-side submenus don't fit a phone screen). */}
+                <MenuGroup className="sm:hidden" aria-label="Snooze">
+                  <MenuSeparator />
                   <MenuLabel>Snooze until</MenuLabel>
                   <SnoozeMenuItems conversation={c} onDone={afterRemove} onCustom={() => setTimeout(() => setCustomSnooze(true), 0)} />
-                </MenuContent>
-              </Menu>
-            </span>
-          </PopoverAnchor>
-          <PopoverContent align="end">
-            <p className="mb-2 text-xs font-medium text-fg-2">Snooze until</p>
-            <CustomDateTimeForm
-              submitLabel="Snooze"
-              onCancel={() => setCustomSnooze(false)}
-              onSubmit={(d) => {
-                actions.snooze(c, d, undefined, { onDone: afterRemove });
-                setCustomSnooze(false);
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-        <ReminderPopover conversation={c} open={reminderOpen} onOpenChange={setReminderOpen}>
-          <IconButton label="Remind me / follow up" shortcut="M">
-            <Bell />
-          </IconButton>
-        </ReminderPopover>
-        <Menu>
-          <MenuTrigger asChild>
-            <IconButton label="More actions">
-              <MoreHorizontal />
-            </IconButton>
-          </MenuTrigger>
-          <MenuContent align="end" className="w-60">
-            <MenuItem onSelect={() => actions.toggleRead(c)} shortcut="U">
-              {c.unreadCount > 0 ? <MailOpen /> : <Mail />} Mark as {c.unreadCount > 0 ? "read" : "unread"}
-            </MenuItem>
-            <MenuItem onSelect={() => actions.togglePin(c)} shortcut="P">
-              {c.pinned ? <PinOff /> : <Pin />} {c.pinned ? "Unpin" : "Pin to top"}
-            </MenuItem>
-            <MenuItem onSelect={() => toggleImportant(c.id)} shortcut="⇧ I">
-              <Zap /> {c.important ? "Remove importance" : "Mark important"}
-            </MenuItem>
-            <MenuItem
-              onSelect={() => {
-                toggleMute(c.id);
-                toast(c.muted ? "Notifications on" : "Muted", { description: c.muted ? undefined : "You won't be notified about new messages here." });
-              }}
-            >
-              {c.muted ? <Bell /> : <BellOff />} {c.muted ? "Unmute" : "Mute"}
-            </MenuItem>
-            <MenuSub>
-              <MenuSubTrigger>
-                <Tag /> Labels
-              </MenuSubTrigger>
-              <MenuSubContent className="w-48">
-                {labels.length === 0 ? <MenuItem disabled>No labels yet</MenuItem> : null}
-                {labels.map((l) => (
-                  <MenuCheckboxItem key={l.id} checked={c.labels.includes(l.id)} onCheckedChange={() => toggleLabel(c.id, l.id)} onSelect={(e) => e.preventDefault()}>
-                    <span className="mx-1 size-2 rounded-full" style={{ background: `oklch(0.65 0.13 ${l.hue})` }} />
-                    {l.name}
-                  </MenuCheckboxItem>
-                ))}
-                <MenuSeparator />
-                <MenuItem asChild>
-                  <Link href="/settings?tab=labels">Manage labels…</Link>
+                  <MenuSeparator />
+                </MenuGroup>
+                <MenuItem onSelect={() => actions.toggleRead(c)} shortcut="U">
+                  {c.unreadCount > 0 ? <MailOpen /> : <Mail />} Mark as {c.unreadCount > 0 ? "read" : "unread"}
                 </MenuItem>
-              </MenuSubContent>
-            </MenuSub>
-            <MenuSeparator />
-            <MenuItem
-              onSelect={() => {
-                void navigator.clipboard?.writeText(`${window.location.origin}${inboxHref({ c: c.id })}`).then(() => toast("Link copied", { icon: <Check className="size-4" /> }));
-              }}
-            >
-              <Copy /> Copy link
-            </MenuItem>
-            {c.externalUrl || info.alternative ? (
-              <MenuItem asChild>
-                <a href={c.externalUrl ?? info.alternative!.url} target="_blank" rel="noreferrer">
-                  <ExternalLink /> Open in {info.shortName}
-                </a>
-              </MenuItem>
-            ) : null}
-          </MenuContent>
-        </Menu>
-        <span className="mx-1 hidden h-5 w-px bg-line xl:block" />
-        <IconButton label={panelOpen ? "Hide details" : "Show details"} shortcut="]" onClick={onTogglePanel} active={panelOpen} className="hidden xl:inline-flex">
-          <PanelRight />
-        </IconButton>
-      </div>
+                <MenuItem onSelect={() => actions.togglePin(c)} shortcut="P">
+                  {c.pinned ? <PinOff /> : <Pin />} {c.pinned ? "Unpin" : "Pin to top"}
+                </MenuItem>
+                <MenuItem onSelect={() => toggleImportant(c.id)} shortcut="⇧ I">
+                  <Zap /> {c.important ? "Remove importance" : "Mark important"}
+                </MenuItem>
+                <MenuItem
+                  onSelect={() => {
+                    toggleMute(c.id);
+                    toast(c.muted ? "Notifications on" : "Muted", { description: c.muted ? undefined : "You won't be notified about new messages here." });
+                  }}
+                >
+                  {c.muted ? <Bell /> : <BellOff />} {c.muted ? "Unmute" : "Mute"}
+                </MenuItem>
+                <MenuSub>
+                  <MenuSubTrigger>
+                    <Tag /> Labels
+                  </MenuSubTrigger>
+                  <MenuSubContent className="w-48">
+                    {labels.length === 0 ? <MenuItem disabled>No labels yet</MenuItem> : null}
+                    {labels.map((l) => (
+                      <MenuCheckboxItem key={l.id} checked={c.labels.includes(l.id)} onCheckedChange={() => toggleLabel(c.id, l.id)} onSelect={(e) => e.preventDefault()}>
+                        <span className="mx-1 size-2 rounded-full" style={{ background: `oklch(0.65 0.13 ${l.hue})` }} />
+                        {l.name}
+                      </MenuCheckboxItem>
+                    ))}
+                    <MenuSeparator />
+                    <MenuItem asChild>
+                      <Link href="/settings?tab=labels">Manage labels…</Link>
+                    </MenuItem>
+                  </MenuSubContent>
+                </MenuSub>
+                <MenuSeparator />
+                <MenuItem
+                  onSelect={() => {
+                    void navigator.clipboard?.writeText(`${window.location.origin}${inboxHref({ c: c.id })}`).then(() => toast("Link copied", { icon: <Check className="size-4" /> }));
+                  }}
+                >
+                  <Copy /> Copy link
+                </MenuItem>
+                {c.externalUrl || info.alternative ? (
+                  <MenuItem asChild>
+                    <a href={c.externalUrl ?? info.alternative!.url} target="_blank" rel="noreferrer">
+                      <ExternalLink /> Open in {info.shortName}
+                    </a>
+                  </MenuItem>
+                ) : null}
+              </MenuContent>
+            </Menu>
+            <span className="mx-1 hidden h-5 w-px bg-line xl:block" />
+            <IconButton label={panelOpen ? "Hide details" : "Show details"} shortcut="]" onClick={onTogglePanel} active={panelOpen} className="hidden xl:inline-flex">
+              <PanelRight />
+            </IconButton>
+          </div>
+        </PopoverAnchor>
+        <PopoverContent align="end">
+          <p className="mb-2 text-xs font-medium text-fg-2">Snooze until</p>
+          <CustomDateTimeForm
+            submitLabel="Snooze"
+            onCancel={() => setCustomSnooze(false)}
+            onSubmit={(d) => {
+              actions.snooze(c, d, undefined, { onDone: afterRemove });
+              setCustomSnooze(false);
+            }}
+          />
+        </PopoverContent>
+      </Popover>
     </header>
   );
 }

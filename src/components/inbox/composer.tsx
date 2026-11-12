@@ -243,7 +243,7 @@ export function ReplyComposer({ conversation: c, account, messages, prefill }: {
       : `Message ${c.title}`;
 
   return (
-    <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
+    <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
       <div
         className={cn(
           "mx-auto w-full rounded-lg border border-line bg-surface shadow-sm transition-[border-color,box-shadow] focus-within:border-line-strong focus-within:shadow-md",
@@ -381,16 +381,16 @@ export function ReplyComposer({ conversation: c, account, messages, prefill }: {
 function BlockedComposer({ block, account, conversation }: { block: NonNullable<ReturnType<typeof replyBlock>>; account?: Account; conversation: Conversation }) {
   const info = account ? PLATFORMS[account.platform] : undefined;
   return (
-    <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
-      <div className="mx-auto flex w-full max-w-[780px] items-start gap-3 rounded-lg border border-dashed border-line-strong bg-surface-sunken px-4 py-3">
+    <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 sm:px-6">
+      <div className="mx-auto flex w-full max-w-[780px] flex-wrap items-start gap-x-3 gap-y-2.5 rounded-lg border border-dashed border-line-strong bg-surface-sunken px-4 py-3">
         {block.kind === "auth" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" /> : <Lock className="mt-0.5 size-4 shrink-0 text-fg-3" />}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[12rem] flex-1">
           <p className="text-[0.8125rem] font-medium text-fg">
             {block.kind === "auth" ? "Reconnect to reply" : block.kind === "window" ? "Reply window closed" : "Replying isn't available here"}
           </p>
           <p className="mt-0.5 text-xs leading-[1.125rem] text-fg-3">{block.reason}</p>
         </div>
-        <div className="flex shrink-0 gap-1.5">
+        <div className="flex shrink-0 gap-1.5 max-sm:ml-7">
           {block.kind === "auth" && account ? (
             <Button asChild size="sm" variant="primary">
               <Link href={`/settings?tab=accounts&reconnect=${account.id}`}>Reconnect</Link>

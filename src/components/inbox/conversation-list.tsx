@@ -37,6 +37,7 @@ import { confirm } from "../ui/dialog";
 import { EmptyState } from "../ui/empty";
 import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { useConversationActions } from "./actions";
+import { usePullToRefresh } from "@/lib/gestures";
 import { InstallBanner } from "../pwa/install";
 import { ConversationRow } from "./conversation-row";
 
@@ -81,6 +82,7 @@ export function ConversationList({ route, className }: { route: ListRoute; class
   const [filter, setFilter] = useState<QuickFilter>(defaultFilter);
   const [sort, setSort] = useState<SortMode>("recent");
   const lastChecked = useRef<string | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const account = route.accountId ? accounts.find((a) => a.id === route.accountId) : undefined;
   const label = route.labelId ? labels.find((l) => l.id === route.labelId) : undefined;
@@ -336,7 +338,9 @@ export function ConversationList({ route, className }: { route: ListRoute; class
       ) : null}
 
       {/* Body */}
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin" role={isConvFolder ? "list" : undefined} aria-label={title}>
+      <div className="relative min-h-0 flex-1">
+      <PullToRefresh scrollRef={bodyRef} enabled={isConvFolder} />
+      <div ref={bodyRef} className="h-full overflow-y-auto overscroll-y-contain scrollbar-thin" role={isConvFolder ? "list" : undefined} aria-label={title}>
         {route.folder === "drafts" && !route.accountId && !route.labelId ? (
           <DraftsList />
         ) : route.folder === "scheduled" && !route.accountId && !route.labelId ? (
@@ -363,7 +367,34 @@ export function ConversationList({ route, className }: { route: ListRoute; class
           ))
         )}
       </div>
+      </div>
     </section>
+  );
+}
+
+/** Refreshes every live account; sample data just confirms it's current. */
+async function refreshInbox() {
+  const { mode, accounts } = useWorkspace.getState();
+  const live = accounts.filter((a) => !a.isDemo);
+  if (mode !== "live" || live.length === 0) {
+    await new Promise((r) => setTimeout(r, 500));
+    toast("You're up to date", { description: mode === "demo" ? "Sample accounts don't sync." : undefined });
+    return;
+  }
+  const timeout = new Promise((r) => setTimeout(r, 15_000));
+  await Promise.race([Promise.all(live.map((a) => fetch(`/api/sync/${a.id}`, { method: "POST" }).catch(() => null))), timeout]);
+  window.dispatchEvent(new Event("orbit:refresh"));
+}
+
+function PullToRefresh({ scrollRef, enabled }: { scrollRef: React.RefObject<HTMLDivElement | null>; enabled: boolean }) {
+  const { pull, refreshing, progress } = usePullToRefresh(scrollRef, refreshInbox, enabled);
+  if (!pull && !refreshing) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center" style={{ transform: `translateY(${pull - 44}px)` }} role="status" aria-label={refreshing ? "Refreshing" : "Pull to refresh"}>
+      <span className="flex size-9 items-center justify-center rounded-full border border-line bg-surface-raised text-fg-2 shadow-md" style={{ opacity: Math.max(0.3, progress) }}>
+        <RefreshCw className={cn("size-4", refreshing && "animate-spin")} style={refreshing ? undefined : { transform: `rotate(${progress * 270}deg)` }} />
+      </span>
+    </div>
   );
 }
 

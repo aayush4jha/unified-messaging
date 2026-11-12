@@ -68,8 +68,8 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "inline-flex items-center justify-center gap-1.5 rounded-[5px] font-medium text-fg-3 transition-[background-color,color,box-shadow] duration-150 hover:text-fg [&_svg]:size-3.5",
-            size === "xs" ? "h-6 px-2 text-xs" : "h-7 px-2.5 text-[0.8125rem]",
+            "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] font-medium text-fg-3 transition-[background-color,color,box-shadow] duration-150 hover:text-fg [&_svg]:size-3.5",
+            size === "xs" ? "h-6 px-2 text-xs pointer-coarse:h-8" : "h-7 px-2.5 text-[0.8125rem] pointer-coarse:h-9",
             value === o.value && "bg-surface text-fg shadow-sm",
           )}
         >

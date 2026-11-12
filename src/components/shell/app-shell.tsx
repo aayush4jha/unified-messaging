@@ -13,6 +13,7 @@ import { LiveBridge } from "../live/live-bridge";
 import { OfflineBanner } from "../pwa/offline-banner";
 import { GlobalOverlays } from "./overlays";
 import { Sidebar } from "./sidebar";
+import { MobileTabBar } from "./tab-bar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const hydrated = useWorkspace((s) => s.hydrated);
@@ -37,6 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex min-w-0 flex-1 flex-col">
         <OfflineBanner />
         <div className="min-h-0 flex-1">{children}</div>
+        <Suspense fallback={null}>
+          <MobileTabBar />
+        </Suspense>
       </main>
       <GlobalShortcuts />
       <LiveBridge />
