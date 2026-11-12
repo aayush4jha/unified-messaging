@@ -3,6 +3,7 @@
 import { addDays, format, isToday, setHours, setMinutes } from "date-fns";
 import { AlarmClock, Check, Hourglass, ListChecks, MoreHorizontal, Plus, Sparkles, Trash2, X } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { detectFollowUps, type FollowUpSuggestion } from "@/lib/intelligence/followups";
@@ -29,7 +30,9 @@ export function FollowUpsView() {
   const conversations = useWorkspace((s) => s.conversations);
   const messages = useWorkspace((s) => s.messages);
   const addReminder = useWorkspace((s) => s.addReminder);
-  const [tab, setTab] = useState<Tab>("today");
+  const params = useSearchParams();
+  const initialTab = params.get("tab");
+  const [tab, setTab] = useState<Tab>(initialTab === "upcoming" || initialTab === "overdue" || initialTab === "waiting" || initialTab === "completed" ? initialTab : "today");
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [newOpen, setNewOpen] = useState(false);
 

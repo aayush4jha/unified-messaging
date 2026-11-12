@@ -169,3 +169,14 @@ test("notification center: open, mark all read", async ({ page }) => {
   await panel.getByRole("button", { name: "Mark all as read" }).click();
   await expect(panel.getByLabel("Unread")).toHaveCount(0);
 });
+
+test("create a task from a single message", async ({ page }) => {
+  await page.goto("/inbox?c=cv_daniel_proposal");
+  const last = page.locator("article").last();
+  await last.hover();
+  await last.getByRole("button", { name: "Message actions" }).click();
+  await page.getByRole("menuitem", { name: "Create task from message" }).click();
+  await expect(page.getByText("Task created from message")).toBeVisible();
+  await page.goto("/follow-ups?tab=upcoming");
+  await expect(page.getByText(/Hi Alex, Nina here/).first()).toBeVisible();
+});

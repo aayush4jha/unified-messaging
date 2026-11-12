@@ -4,6 +4,21 @@
 
 Orbit is a unified communication workspace. It brings email, work chat and messaging into one keyboard-first interface: multiple Gmail and Outlook accounts, Microsoft Teams, Slack workspaces and Telegram bots, with an assistant that briefs you, summarizes threads and drafts replies. It never sends anything on its own.
 
+![Unified inbox: an email thread with the contact panel](docs/screenshots/inbox-light.jpg)
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/slack-dark.jpg" alt="Slack channel in dark mode"></td>
+    <td><img src="docs/screenshots/palette-dark.jpg" alt="Command palette understanding a natural-language search"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/analytics.jpg" alt="Analytics"></td>
+    <td><img src="docs/screenshots/assistant.jpg" alt="Assistant and daily briefing"></td>
+  </tr>
+</table>
+
+<sub>Screenshots use the built-in sample workspace. All people and conversations are fictional.</sub>
+
 ## Quick start (sample workspace)
 
 ```bash
@@ -36,7 +51,7 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build / server |
 | `npm test` | Unit tests (search, prioritization, follow-ups, analytics, crypto, OAuth state, Gmail/Slack/Telegram parsing) |
-| `npm run test:e2e` | Playwright end-to-end journeys against the sample workspace |
+| `npm run test:e2e` | Playwright end-to-end journeys plus an axe-core WCAG 2.1 AA audit of every main screen, both themes |
 | `npm run typecheck` / `npm run lint` | TypeScript / ESLint |
 
 ## Status

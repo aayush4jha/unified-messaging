@@ -97,6 +97,8 @@ export interface WorkspaceState {
   labels: Label[];
   notifications: AppNotification[];
   priorityRules: PriorityRule[];
+  /** Daily unread snapshots recorded server-side (live mode only). */
+  unreadSnapshots: { day: string; unread: number }[];
   sidebar: SidebarState;
   prefs: Preferences;
 
@@ -106,7 +108,7 @@ export interface WorkspaceState {
   resetWorkspace(): void;
   hydrateLive(
     data: Pick<WorkspaceState, "accounts" | "conversations" | "labels" | "reminders" | "notes" | "notifications"> &
-      Partial<Pick<WorkspaceState, "contacts" | "drafts" | "scheduled" | "priorityRules">> & { preferences?: Partial<Preferences> | null },
+      Partial<Pick<WorkspaceState, "contacts" | "drafts" | "scheduled" | "priorityRules" | "unreadSnapshots">> & { preferences?: Partial<Preferences> | null },
   ): void;
   setMessages(conversationId: string, messages: Message[]): void;
 
@@ -226,6 +228,7 @@ export const useWorkspace = create<WorkspaceState>()(
         hydrated: false,
         ...emptyData(),
         priorityRules: DEFAULT_PRIORITY_RULES,
+        unreadSnapshots: [],
         sidebar: DEFAULT_SIDEBAR,
         prefs: DEFAULT_PREFS,
 
@@ -233,7 +236,7 @@ export const useWorkspace = create<WorkspaceState>()(
 
         loadDemo: () => {
           const data = createDemoData();
-          set({ ...data, mode: "demo" });
+          set({ ...data, mode: "demo", unreadSnapshots: [] });
         },
 
         hydrateLive: ({ preferences, ...data }) =>

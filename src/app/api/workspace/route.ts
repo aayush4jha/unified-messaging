@@ -45,6 +45,7 @@ export async function GET() {
     db.from("priority_rules").select("*"),
     db.from("user_preferences").select("prefs,ai_enabled,retention_days").maybeSingle(),
   ]);
+  const snapshots = await db.from("unread_snapshots").select("day,unread_conversations").gte("day", new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)).order("day");
   const err = [accounts, conversations].find((r) => r.error);
   if (err?.error) return NextResponse.json({ error: err.error.message }, { status: 500 });
 
@@ -64,6 +65,7 @@ export async function GET() {
     drafts: (drafts.data ?? []).map((d) => ({ id: d.id, accountId: d.account_id, conversationId: d.conversation_id ?? undefined, to: d.to_addrs ?? [], subject: d.subject ?? undefined, body: d.body, updatedAt: d.updated_at })),
     scheduled: (scheduled.data ?? []).map((m) => ({ id: m.id, accountId: m.account_id, conversationId: m.conversation_id ?? undefined, to: m.to_addrs ?? [], subject: m.subject ?? undefined, body: m.body, sendAt: m.send_at, createdAt: m.created_at })),
     priorityRules: (rules.data ?? []).map((r) => ({ id: r.id, kind: r.kind, value: r.value, effect: r.effect, enabled: r.enabled })),
+    unreadSnapshots: (snapshots.data ?? []).map((r) => ({ day: r.day as string, unread: r.unread_conversations as number })),
     preferences: prefs.data ? { ...(prefs.data.prefs as object), aiEnabled: prefs.data.ai_enabled, retentionDays: prefs.data.retention_days } : null,
   });
 }

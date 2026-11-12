@@ -1,6 +1,8 @@
 "use client";
 
-import { AlertCircle, Check, CheckCheck, ChevronDown, Clock, Download, FileText, Image as ImageIcon, MessageSquare, RotateCw, Trash2 } from "lucide-react";
+import { addDays, setHours, setMinutes } from "date-fns";
+import { AlarmClock, AlertCircle, Check, CheckCheck, ChevronDown, Clock, Copy, Download, FileText, Image as ImageIcon, ListPlus, MessageSquare, MoreHorizontal, RotateCw, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import type { Account, Attachment, Contact, Conversation, Message, Participant } from "@/lib/types";
@@ -9,7 +11,53 @@ import { DEMO_USER } from "@/lib/demo/seed";
 import { useWorkspace } from "@/store/workspace";
 import { Avatar } from "../ui/avatar";
 import { Button } from "../ui/button";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/menu";
 import { Tooltip } from "../ui/tooltip";
+
+/* ------------------------------------------------------------------ per-message actions */
+
+/** Turn any message into a task or reminder, or copy it. */
+export function MessageMenu({ conversation: c, message: m, className }: { conversation: Conversation; message: Message; className?: string }) {
+  const router = useRouter();
+  const addReminder = useWorkspace((s) => s.addReminder);
+  if (m.status === "pending" || m.status === "failed") return null;
+  const excerpt = m.body.replace(/\s+/g, " ").trim();
+  const title = excerpt ? (excerpt.length > 90 ? `${excerpt.slice(0, 89).trimEnd()}…` : excerpt) : c.title;
+  const tomorrow9 = () => setMinutes(setHours(addDays(new Date(), 1), 9), 0).toISOString();
+  return (
+    <Menu>
+      <MenuTrigger asChild>
+        <button
+          aria-label="Message actions"
+          className={cn("inline-flex size-6 items-center justify-center rounded-[5px] text-fg-3 opacity-0 transition-opacity hover:bg-hover hover:text-fg focus-visible:opacity-100 group-hover/msg:opacity-100 data-[state=open]:opacity-100", className)}
+        >
+          <MoreHorizontal className="size-3.5" />
+        </button>
+      </MenuTrigger>
+      <MenuContent align="end" className="w-56">
+        <MenuItem
+          onSelect={() => {
+            addReminder({ kind: "task", title, conversationId: c.id, contactId: c.contactId, dueAt: tomorrow9(), note: excerpt.length > 90 ? excerpt.slice(0, 600) : undefined, source: "user" });
+            toast("Task created from message", { description: title, action: { label: "View", onClick: () => router.push("/follow-ups?tab=upcoming") } });
+          }}
+        >
+          <ListPlus /> Create task from message
+        </MenuItem>
+        <MenuItem
+          onSelect={() => {
+            addReminder({ kind: "reminder", title: `Revisit: ${title}`, conversationId: c.id, contactId: c.contactId, dueAt: tomorrow9(), source: "user" });
+            toast("Reminder set for tomorrow, 9:00 AM");
+          }}
+        >
+          <AlarmClock /> Remind me tomorrow
+        </MenuItem>
+        <MenuItem onSelect={() => void navigator.clipboard?.writeText(m.body).then(() => toast("Copied"))}>
+          <Copy /> Copy text
+        </MenuItem>
+      </MenuContent>
+    </Menu>
+  );
+}
 
 export interface ThreadProps {
   conversation: Conversation;
@@ -164,7 +212,8 @@ export function EmailThread({ conversation: c, messages }: ThreadProps) {
                   more message{hiddenCount === 1 ? "" : "s"}
                 </button>
               ) : null}
-              <article className={cn("border-b border-line-subtle last:border-b-0", !isOpen && "hover:bg-hover")}>
+              <article className={cn("group/msg relative border-b border-line-subtle last:border-b-0", !isOpen && "hover:bg-hover")}>
+                {isOpen ? <MessageMenu conversation={c} message={m} className="absolute right-3 top-3" /> : null}
                 <button
                   type="button"
                   className="flex w-full items-start gap-3 px-5 pb-2 pt-4 text-left"
@@ -183,7 +232,7 @@ export function EmailThread({ conversation: c, messages }: ThreadProps) {
                     <div className="flex items-baseline gap-2">
                       <span className="truncate text-[0.8125rem] font-semibold text-fg">{a.name}</span>
                       {isOpen && a.handle ? <span className="hidden truncate text-xs text-fg-3 sm:inline">&lt;{a.handle}&gt;</span> : null}
-                      <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[0.6875rem] text-fg-3">
+                      <span className={cn("ml-auto flex shrink-0 items-center gap-1.5 text-[0.6875rem] text-fg-3", isOpen && "pr-7")}>
                         {m.attachments.length > 0 && !isOpen ? <span className="text-fg-4">📎</span> : null}
                         <DeliveryStatus message={m} platform={c.platform} />
                         {m.status !== "pending" ? formatMessageTime(m.sentAt) : null}
@@ -242,7 +291,8 @@ export function ChatThread({ conversation: c, messages }: ThreadProps) {
                 <span className="rounded-full border border-line bg-surface-raised/95 px-2.5 py-0.5 text-[0.6875rem] font-medium text-fg-3 shadow-xs backdrop-blur">{day}</span>
               </div>
             ) : null}
-            <div className={cn("flex items-end gap-2", a.isMe ? "justify-end" : "justify-start", grouped ? "mt-0.5" : "mt-3")}>
+            <div className={cn("group/msg flex items-end gap-2", a.isMe ? "justify-end" : "justify-start", grouped ? "mt-0.5" : "mt-3")}>
+              {a.isMe ? <MessageMenu conversation={c} message={m} className="mb-1" /> : null}
               {!a.isMe && isGroup ? <span className="w-7 shrink-0">{lastInGroup ? <Avatar name={a.name} hue={a.avatarHue} size="sm" /> : null}</span> : null}
               <div className={cn("flex max-w-[min(78%,520px)] flex-col", a.isMe ? "items-end" : "items-start")}>
                 {!a.isMe && isGroup && !grouped ? <span className="mb-1 ml-3 text-[0.6875rem] font-medium" style={{ color: `oklch(0.55 0.12 ${a.avatarHue ?? 200})` }}>{a.name}</span> : null}
@@ -276,6 +326,7 @@ export function ChatThread({ conversation: c, messages }: ThreadProps) {
                 ) : null}
                 <FailedNotice message={m} conversationId={c.id} />
               </div>
+              {!a.isMe ? <MessageMenu conversation={c} message={m} className="mb-1" /> : null}
             </div>
           </Fragment>
         );
@@ -316,7 +367,8 @@ export function SlackThread({ conversation: c, messages }: ThreadProps) {
                 <div className="h-px flex-1 bg-line" />
               </div>
             ) : null}
-            <div className={cn("group/msg flex gap-3 px-5 py-1 hover:bg-hover/60", !grouped && "mt-1.5 pt-2")}>
+            <div className={cn("group/msg relative flex gap-3 px-5 py-1 hover:bg-hover/60", !grouped && "mt-1.5 pt-2")}>
+              <MessageMenu conversation={c} message={m} className="absolute right-4 top-1" />
               <span className="w-9 shrink-0">
                 {!grouped ? (
                   <Avatar name={a.isMe ? DEMO_USER.name : a.name} hue={a.avatarHue} size="md" className="[&_[data-avatar]]:rounded-[8px]" />
@@ -409,7 +461,8 @@ export function ProfessionalThread({ conversation: c, messages, contacts }: Thre
           return (
             <Fragment key={m.id}>
               {showDay ? <div className="text-center text-[0.6875rem] font-medium uppercase tracking-[0.06em] text-fg-4">{day}</div> : null}
-              <div className="flex gap-3">
+              <div className="group/msg relative flex gap-3">
+                <MessageMenu conversation={c} message={m} className="absolute -right-1 top-0" />
                 <Avatar name={a.isMe ? DEMO_USER.name : a.name} hue={a.avatarHue} size="sm" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">

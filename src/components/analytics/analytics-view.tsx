@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { Info } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts";
 import { computeAnalytics, formatMinutes } from "@/lib/intelligence/analytics";
 import { PLATFORMS } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export function AnalyticsView() {
   const accounts = useWorkspace((s) => s.accounts);
   const contacts = useWorkspace((s) => s.contacts);
   const mode = useWorkspace((s) => s.mode);
+  const snapshots = useWorkspace((s) => s.unreadSnapshots);
   const [range, setRange] = useState<Range>("14");
   const [showTable, setShowTable] = useState(false);
 
@@ -225,6 +226,22 @@ export function AnalyticsView() {
             </Panel>
           </div>
 
+          {snapshots.length >= 7 ? (
+            <Panel title="Unread trend" subtitle="Conversations with unread messages at the end of each day">
+              <div className="h-[180px]" role="img" aria-label={`Line chart of unread conversations over the last ${snapshots.length} days`}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={snapshots.map((s) => ({ ...s, label: format(new Date(`${s.day}T12:00:00`), "MMM d") }))} margin={{ top: 6, right: 8, bottom: 0, left: -18 }}>
+                    <CartesianGrid vertical={false} stroke="var(--border-subtle)" />
+                    <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "var(--border)" }} tick={{ fill: "var(--text-3)", fontSize: 11 }} minTickGap={24} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "var(--text-3)", fontSize: 11 }} width={40} />
+                    <RTooltip content={<DayTooltip />} cursor={{ stroke: "var(--border-strong)" }} />
+                    <Line type="monotone" dataKey="unread" name="Unread" stroke="var(--series-1)" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }} isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Panel>
+          ) : null}
+
           {/* Honest limitations */}
           <div className="flex gap-3 rounded-lg border border-line bg-surface-sunken px-4 py-3 text-xs leading-[1.125rem] text-fg-3">
             <Info className="mt-px size-4 shrink-0 text-fg-3" />
@@ -233,9 +250,11 @@ export function AnalyticsView() {
                 <span className="font-medium text-fg-2">Coverage:</span> based on {Object.values(messages).reduce((n, m) => n + m.length, 0)} synced messages
                 {a.earliestMessageAt ? ` since ${format(new Date(a.earliestMessageAt), "MMM d")}` : ""}. Ranges longer than the synced history show only what&apos;s available.
               </p>
-              <p>
-                <span className="font-medium text-fg-2">Unread trend isn&apos;t shown</span> because providers don&apos;t expose historical unread counts. Orbit records a daily snapshot from the day an account is connected, and the trend appears once a week of snapshots exists.
-              </p>
+              {snapshots.length < 7 ? (
+                <p>
+                  <span className="font-medium text-fg-2">Unread trend isn&apos;t shown yet</span> because providers don&apos;t expose historical unread counts. Orbit records a daily snapshot from the day an account is connected ({snapshots.length} so far), and the trend appears once a week of snapshots exists.
+                </p>
+              ) : null}
               <p>Response times exclude channels and group chats, where it&apos;s unclear who a reply is to.</p>
             </div>
           </div>
