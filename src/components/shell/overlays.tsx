@@ -1,12 +1,50 @@
 "use client";
 
+import { useEffect } from "react";
+import { toast } from "sonner";
 import { modKey } from "@/lib/utils";
 import { useUI } from "@/store/ui";
+import { useWorkspace } from "@/store/workspace";
+import { CommandPalette } from "../command/command-palette";
+import { ComposeWindow } from "../compose/compose-window";
+import { NotificationCenter } from "../notifications/notification-center";
 import { Dialog, DialogContent } from "../ui/dialog";
 import { Kbd } from "../ui/kbd";
 
 export function GlobalOverlays() {
-  return <ShortcutsDialog />;
+  return (
+    <>
+      <ComposeWindow />
+      <CommandPalette />
+      <NotificationCenter />
+      <ShortcutsDialog />
+      <ScheduledDispatcher />
+    </>
+  );
+}
+
+/**
+ * Sends scheduled messages from sample accounts when they come due while Orbit
+ * is open. Live accounts are dispatched server-side by the scheduled-send job,
+ * so they still go out when the app is closed.
+ */
+function ScheduledDispatcher() {
+  useEffect(() => {
+    const tick = async () => {
+      const { scheduled, accounts, cancelScheduled, send } = useWorkspace.getState();
+      const due = scheduled.filter((m) => new Date(m.sendAt).getTime() <= Date.now() && accounts.find((a) => a.id === m.accountId)?.isDemo);
+      for (const m of due) {
+        cancelScheduled(m.id);
+        const r = await send({ clientId: `sched_${m.id}`, accountId: m.accountId, conversationId: m.conversationId, to: m.to, subject: m.subject, body: m.body, attachments: [] });
+        if (r.ok) toast.success("Scheduled message sent", { description: m.to.join(", ") });
+        else toast.error("Scheduled message failed", { description: r.error });
+      }
+    };
+    void tick();
+    const i = setInterval(tick, 20_000);
+    return () => clearInterval(i);
+  }, []);
+  return null;
 }
 
 const SHORTCUTS: { group: string; items: [string, string][] }[] = [

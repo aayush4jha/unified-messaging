@@ -26,6 +26,8 @@ export interface SearchFilters {
   platforms: PlatformId[];
   accountIds: string[];
   contactIds: string[];
+  /** Contacts who must have authored the matching message ("from X"). */
+  fromContactIds: string[];
   /** Free-form sender names that didn't resolve to a contact. */
   people: string[];
   after?: string;
@@ -49,6 +51,7 @@ export const emptyFilters = (): SearchFilters => ({
   platforms: [],
   accountIds: [],
   contactIds: [],
+  fromContactIds: [],
   people: [],
   attachmentKinds: [],
   kinds: [],
@@ -113,7 +116,7 @@ export function parseQuery(raw: string, ctx: SearchContext): ParsedQuery {
 
   // Explicit operators
   const nlTerms: string[] = [];
-  take(/\b(from|with|to):("[^"]+"|\S+)/i, (m) => resolvePerson(m[2].replace(/"/g, ""), true));
+  take(/\b(from|with|to):("[^"]+"|\S+)/i, (m) => resolvePerson(m[2].replace(/"/g, ""), true, m[1].toLowerCase() === "from"));
   take(/\b(in|platform|on):(\S+)/i, (m) => addPlatform(m[2].toLowerCase()));
   take(/\baccount:(\S+)/i, (m) => {
     const v = m[1].toLowerCase();
@@ -171,7 +174,12 @@ export function parseQuery(raw: string, ctx: SearchContext): ParsedQuery {
   take(/\b(?:i sent|sent by me|my replies)\b/i, () => setFromMe());
 
   // "from Rahul", "with Priya", "by Daniel"
-  take(/\b(?:from|with|by)\s+([A-Z][\p{L}'-]+(?:\s+[A-Z][\p{L}'-]+)?)/u, (m) => resolvePerson(m[1], false));
+  take(/\b(from|with|by)\s+([A-Z][\p{L}'-]+(?:\s+[A-Z][\p{L}'-]+)?)/iu, (m) => {
+    const first = m[2].split(/\s+/)[0].toLowerCase();
+    // Lowercase words after "from" only count when they're a known contact ("from rahul")
+    if (m[2][0] !== m[2][0].toUpperCase() && !matchContact(first)) return;
+    resolvePerson(m[2], false, m[1].toLowerCase() !== "with");
+  });
 
   // Platform names in free text
   const words = q.split(/\s+/).filter(Boolean);
@@ -203,15 +211,16 @@ export function parseQuery(raw: string, ctx: SearchContext): ParsedQuery {
     return ctx.contacts.find((c) => c.name.toLowerCase().split(/\s+/).some((part) => part.replace(/[^\p{L}]/gu, "") === n) || c.name.toLowerCase() === n);
   }
 
-  function addContact(c: Contact) {
+  function addContact(c: Contact, from = false) {
     if (!filters.contactIds.includes(c.id)) filters.contactIds.push(c.id);
-    chips.push({ key: `contact:${c.id}`, label: `Person: ${c.name}` });
+    if (from && !filters.fromContactIds.includes(c.id)) filters.fromContactIds.push(c.id);
+    chips.push({ key: `contact:${c.id}`, label: from ? `From: ${c.name}` : `Person: ${c.name}` });
   }
 
-  function resolvePerson(name: string, explicit: boolean) {
+  function resolvePerson(name: string, explicit: boolean, from = false) {
     const first = name.trim().split(/\s+/)[0];
     const c = matchContact(first) ?? ctx.contacts.find((x) => x.name.toLowerCase().includes(name.toLowerCase()));
-    if (c) addContact(c);
+    if (c) addContact(c, from);
     else if (explicit && name.trim()) {
       filters.people.push(name.toLowerCase());
       chips.push({ key: `person:${name}`, label: `Person: ${name}` });
@@ -311,6 +320,11 @@ export function runSearch(
       if (filters.after && m.sentAt < filters.after) continue;
       if (filters.before && m.sentAt > filters.before) continue;
       if (filters.fromMe && m.authorId !== "me") continue;
+      if (filters.fromContactIds.length) {
+        const author = conv.participants.find((p) => p.id === m.authorId);
+        const ids = new Set(filters.fromContactIds.flatMap((id) => [id, ...(contactById.get(id)?.mergedFrom.map((x) => x.id) ?? [])]));
+        if (!author?.contactId || !ids.has(author.contactId)) continue;
+      }
       if (filters.hasAttachment) {
         if (m.attachments.length === 0) continue;
         if (filters.attachmentKinds.length && !m.attachments.some((a) => filters.attachmentKinds.some((k) => attachmentIs(a.mimeType, a.name, k)))) continue;
