@@ -10,7 +10,7 @@ download a new version.
 | **iPhone / iPad** | Safari → Share → **Add to Home Screen** (steps shown on `/download`) | Free |
 | **Desktop** | Install icon in Chrome/Edge's address bar, Safari → File → Add to Dock, or just the website | Free |
 
-**The link to share is `https://<your-domain>/download`.** It detects the device:
+**The link to share is `https://<your-domain>/download`.** Production: https://orbit-inbox.vercel.app/download (Android app `io.github.aayush4jha.orbit` 1.0.0, signing certificate SHA-256 `18:65:2E:FC:3E:3C:FF:B7:2A:AC:67:CC:B6:DE:A4:AE:D4:80:E0:1C:36:F8:9E:51:C5:B3:72:50:40:9E:E0:D7`). It detects the device:
 - Android visitors get the APK button.
 - iPhone visitors get the Add to Home Screen steps. Instagram and LinkedIn in-app browsers get "Open in Safari" first.
 - Desktop visitors get a QR code to scan with their phone.

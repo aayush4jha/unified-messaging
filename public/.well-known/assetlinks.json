@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.aayush4jha.orbit",
+      "sha256_cert_fingerprints": [
+        "18:65:2E:FC:3E:3C:FF:B7:2A:AC:67:CC:B6:DE:A4:AE:D4:80:E0:1C:36:F8:9E:51:C5:B3:72:50:40:9E:E0:D7"
+      ]
+    }
+  }
+]

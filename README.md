@@ -47,6 +47,8 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 
 ## Mobile apps
 
+**Live:** https://orbit-inbox.vercel.app · **Get the app:** https://orbit-inbox.vercel.app/download
+
 One codebase installs on every device. Share **`/download`**: it detects the device and shows the right install path.
 
 - **Android:** a signed APK (about 1.3 MB) built from the web app with Google's Bubblewrap (`scripts/build-android.sh <domain>`), or Chrome's "Install app".
