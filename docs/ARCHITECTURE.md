@@ -95,9 +95,11 @@ Records that can be persisted use client-generated UUIDs, so optimistic local st
 
 ## 5. Sync
 
-- **Initial sync**: `POST /api/sync/:accountId` pages through `listConversations` and `listMessages` and upserts into `conversations` and `messages`. Progress is recorded in `sync_jobs`.
-- **Incremental sync**: webhooks where available (Gmail Pub/Sub watch, Slack Events API, Telegram `setWebhook`). A scheduled job (`/api/cron/sync`, protected by `CRON_SECRET`) catches anything missed.
-- **Retries & rate limits**: connector errors are typed (`AuthError`, `RateLimitError` with `retryAfter`, `TransientError`). Jobs back off exponentially with jitter and honor `Retry-After`. Auth errors move the account to `needs_reauth` and surface a Reconnect action.
+- **Incremental by default.** Connectors that support it sync only what changed: Gmail through `history.list` from the stored `historyId` (falling back to a full list when Google has expired the id), Outlook through Graph delta queries with a per-folder `deltaLink` (resuming long first enumerations). Cursors live in `connected_accounts.sync_cursor`.
+- **Push.** With `ORBIT_PUBLIC_URL` set, each sync also creates or renews provider push: Gmail `users.watch` → Pub/Sub → `/api/webhooks/gmail` (token-verified), and Outlook subscriptions → `/api/webhooks/outlook` (validation handshake plus a per-account `clientState`). Slack Events and Telegram webhooks are verified by signature and secret token. Each push triggers an incremental sync after the response.
+- **Realtime to the browser.** `conversations`, `messages` and `notifications` are in the Supabase Realtime publication (RLS-enforced). The client coalesces bursts into one refresh, reloads open threads, and surfaces notifications through the DND, quiet-hours and priority policy. Polling drops to every 5 minutes as a safety net.
+- **Cron** (`/api/cron/sync`, every 5 minutes): catches anything push missed, renews subscriptions, sends due scheduled messages, applies retention and records unread snapshots.
+- **Retries & rate limits:** connector errors are typed (`AuthError`, `RateLimitError` with `retryAfter`, `TransientError`). Rate-limited jobs are rescheduled after `Retry-After`. Auth errors move the account to `needs_reauth` and create a notification with a Reconnect action.
 
 ## 6. Security
 

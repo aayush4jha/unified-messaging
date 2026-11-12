@@ -262,6 +262,59 @@ export const OutlookConnector: Connector = {
     return { externalMessageId: draft.id, externalConversationId: draft.conversationId, sentAt: new Date().toISOString() };
   },
 
+  async incremental(ctx, cursor) {
+    const links = { ...((cursor.deltaLinks as Record<string, string> | undefined) ?? {}) };
+    const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const changed = new Set<string>();
+    for (const folder of ["inbox", "sentitems"] as const) {
+      let url: string | undefined = links[folder] ?? `/me/mailFolders/${folder}/messages/delta?$select=id,conversationId,isRead,parentFolderId&$filter=receivedDateTime ge ${since}`;
+      let pages = 0;
+      while (url && pages < 25) {
+        const r: { value: ({ conversationId?: string; "@removed"?: unknown })[]; "@odata.nextLink"?: string; "@odata.deltaLink"?: string } = await graph(ctx, url, { headers: { prefer: "odata.maxpagesize=50" } }, `delta ${folder}`);
+        for (const m of r.value) if (!m["@removed"] && m.conversationId) changed.add(m.conversationId);
+        pages++;
+        if (r["@odata.deltaLink"]) {
+          links[folder] = r["@odata.deltaLink"];
+          url = undefined;
+        } else {
+          url = r["@odata.nextLink"];
+          // Long first enumeration: resume from here next time instead of starting over.
+          if (url && pages >= 25) links[folder] = url;
+        }
+      }
+    }
+    const inbox = await folderId(ctx, "inbox");
+    const items: NormalizedConversation[] = [];
+    for (const id of [...changed].slice(0, 100)) {
+      const r = await graph<{ value: GraphMessage[] }>(ctx, `/me/messages?$top=100&$filter=conversationId eq '${id.replace(/'/g, "''")}'&$select=${SELECT}`, {}, "conversation messages");
+      const conv = groupGraphConversations(r.value, ctx.accountHandle, inbox)[0];
+      if (!conv) continue;
+      await attachAttachmentLists(ctx, conv.messages ?? []);
+      items.push(conv);
+    }
+    return { items, cursor: { ...cursor, deltaLinks: links } };
+  },
+
+  /** Graph change notifications for new/updated Inbox mail. Mail subscriptions last up to 7 days; renewed daily. */
+  async subscribe(ctx, { notificationUrl, secret, existing }) {
+    const ex = existing as { id?: string; expiresAt?: number } | undefined;
+    if (ex?.id && (ex.expiresAt ?? 0) - Date.now() > 24 * 3_600_000) return ex;
+    const expirationDateTime = new Date(Date.now() + 6 * 86_400_000).toISOString();
+    if (ex?.id) {
+      try {
+        await graph(ctx, `/subscriptions/${ex.id}`, { method: "PATCH", body: JSON.stringify({ expirationDateTime }) }, "renew subscription");
+        return { id: ex.id, expiresAt: Date.parse(expirationDateTime) };
+      } catch {
+        // Expired or deleted: create a new one below.
+      }
+    }
+    const sub = await graph<{ id: string; expirationDateTime: string }>(ctx, "/subscriptions", {
+      method: "POST",
+      body: JSON.stringify({ changeType: "created,updated", notificationUrl, resource: "me/mailFolders('inbox')/messages", expirationDateTime, clientState: secret, latestSupportedTlsVersion: "v1_2" }),
+    }, "create subscription");
+    return { id: sub.id, expiresAt: Date.parse(sub.expirationDateTime) };
+  },
+
   async markRead(ctx, conversationId) {
     const r = await graph<{ value: { id: string }[] }>(ctx, `/me/messages?$top=50&$filter=conversationId eq '${conversationId.replace(/'/g, "''")}' and isRead eq false&$select=id`, {}, "unread in conversation");
     for (const m of r.value) await graph(ctx, `/me/messages/${encodeURIComponent(m.id)}`, { method: "PATCH", body: JSON.stringify({ isRead: true }) }, "mark read");

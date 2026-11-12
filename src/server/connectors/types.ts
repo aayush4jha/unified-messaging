@@ -105,6 +105,13 @@ export interface SendResult {
   sentAt: string;
 }
 
+export interface IncrementalResult {
+  /** Conversations that changed since the cursor (with their messages). */
+  items: NormalizedConversation[];
+  /** Opaque provider state persisted in connected_accounts.sync_cursor. */
+  cursor: Record<string, unknown>;
+}
+
 export interface Connector {
   platform: PlatformId;
   isConfigured(): boolean;
@@ -116,6 +123,10 @@ export interface Connector {
   listMessages(ctx: ConnectorContext, externalConversationId: string, cursor?: string): Promise<Page<NormalizedMessage>>;
   send(ctx: ConnectorContext, msg: OutboundMessage): Promise<SendResult>;
   markRead?(ctx: ConnectorContext, externalConversationId: string): Promise<void>;
+  /** Changes since `cursor` (Gmail historyId, Graph deltaLinks). Falls back to a full list when the cursor is stale. */
+  incremental?(ctx: ConnectorContext, cursor: Record<string, unknown>): Promise<IncrementalResult>;
+  /** Creates/renews provider push (Gmail watch, Graph subscription). Returns state to persist, or null if push isn't configured. */
+  subscribe?(ctx: ConnectorContext, opts: { notificationUrl: string; secret: string; existing?: Record<string, unknown> }): Promise<Record<string, unknown> | null>;
   /** Fetches a received attachment from the provider (Orbit doesn't store file bytes). */
   downloadAttachment?(ctx: ConnectorContext, messageExternalId: string, attachment: NormalizedAttachment): Promise<DownloadedFile>;
   /** Per-file and total limits for outbound attachments (bytes). */

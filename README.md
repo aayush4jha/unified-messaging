@@ -15,15 +15,16 @@ With no configuration, Orbit runs as a **sample workspace**: 12 sample accounts 
 
 ## Live accounts
 
-1. **Supabase.** Create a project and run the migrations in [`supabase/migrations/`](supabase/migrations) in order (`0001` → `0003`) in the SQL editor. They create the schema, indexes and Row Level Security. Enable Email (magic link) auth.
+1. **Supabase.** Create a project and run the migrations in [`supabase/migrations/`](supabase/migrations) in order (`0001` → `0004`) in the SQL editor. They create the schema, indexes and Row Level Security. Enable Email (magic link) auth.
 2. **Environment.** Copy [`.env.example`](.env.example) to `.env.local` and fill it in. At minimum you need the Supabase keys, `ORBIT_TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`) and `ORBIT_PUBLIC_URL`.
 3. **Connectors.**
    - **Gmail**: create a Google OAuth client and enable the Gmail API. Add `${ORBIT_PUBLIC_URL}/api/connectors/gmail/callback` as a redirect URI. While the app is unverified, add yourself as a test user.
    - **Outlook / Microsoft 365**: register an app in the Entra admin center for "any organizational directory and personal Microsoft accounts". Add the redirect URI `${ORBIT_PUBLIC_URL}/api/connectors/outlook/callback` and the delegated permissions `User.Read Mail.ReadWrite Mail.Send offline_access`.
    - **Slack**: create an app with the user scopes listed in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md), set the redirect URL, and point Event Subscriptions to `/api/webhooks/slack`.
    - **Telegram**: no app setup. Paste a bot token from @BotFather in Settings → Accounts.
-4. **Background sync.** [`vercel.json`](vercel.json) schedules `/api/cron/sync` every 5 minutes (set `CRON_SECRET`). On other hosts, call it with `Authorization: Bearer $CRON_SECRET`.
-5. **AI (optional).** Set `ANTHROPIC_API_KEY`. Without it, briefings and assistant answers use Orbit's rules and say so.
+4. **Real time.** Run `0004_realtime.sql` so the inbox updates live via Supabase Realtime. With `ORBIT_PUBLIC_URL` set, Orbit also registers provider push: Outlook change notifications automatically, Gmail via Pub/Sub (see `.env.example`), and Slack/Telegram webhooks.
+5. **Background sync.** [`vercel.json`](vercel.json) schedules `/api/cron/sync` every 5 minutes (set `CRON_SECRET`). On other hosts, call it with `Authorization: Bearer $CRON_SECRET`.
+6. **AI (optional).** Set `ANTHROPIC_API_KEY`. Without it, briefings and assistant answers use Orbit's rules and say so.
 
 ## Scripts
 

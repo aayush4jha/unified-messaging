@@ -1,7 +1,10 @@
 "use client";
 
+import { createBrowserClient } from "@supabase/ssr";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { decide, showDesktopNotification } from "@/lib/notify";
 import { accountPatch, conversationPatch, diffById, diffContacts, diffConversationLabels, diffNotes } from "@/lib/live-diff";
 import type { Conversation } from "@/lib/types";
 import { useWorkspace, type WorkspaceState } from "@/store/workspace";
@@ -16,6 +19,11 @@ import { useWorkspace, type WorkspaceState } from "@/store/workspace";
  */
 export function LiveBridge() {
   const hydrating = useRef(false);
+  const router = useRouter();
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   useEffect(() => {
     let alive = true;
@@ -33,11 +41,14 @@ export function LiveBridge() {
       hydrating.current = false;
     };
 
+    let stopRealtime: (() => void) | undefined;
     void (async () => {
       const s = await fetch("/api/session").then((r) => r.json()).catch(() => null);
       if (!alive || !s?.backend || !s.user) return;
       await refresh(true);
-      timer = setInterval(() => void refresh(false), 60_000);
+      // Realtime when available; polling stays as a slower safety net.
+      stopRealtime = startRealtime(s.user.id, () => void refresh(false), (href) => routerRef.current.push(href));
+      timer = setInterval(() => void refresh(false), stopRealtime ? 5 * 60_000 : 60_000);
     })();
 
     const unsub = useWorkspace.subscribe((state, prev) => {
@@ -51,6 +62,7 @@ export function LiveBridge() {
     return () => {
       alive = false;
       if (timer) clearInterval(timer);
+      stopRealtime?.();
       unsub();
       document.removeEventListener("visibilitychange", flushOnHide);
       void outbox.flush();
@@ -58,6 +70,52 @@ export function LiveBridge() {
   }, []);
 
   return null;
+}
+
+/**
+ * Subscribes to Postgres changes for this user (RLS-filtered by Supabase Realtime).
+ * Coalesces bursts into one refresh, reloads open conversations, and surfaces
+ * new notifications through the user's notification policy.
+ */
+function startRealtime(userId: string, refresh: () => void, navigate: (href: string) => void): (() => void) | undefined {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return undefined;
+  const supabase = createBrowserClient(url, anon);
+  let pending: ReturnType<typeof setTimeout> | null = null;
+  const soon = () => {
+    if (pending) clearTimeout(pending);
+    pending = setTimeout(refresh, 800);
+  };
+  const reloadConversation = (conversationId: string) => {
+    if (useWorkspace.getState().messages[conversationId] === undefined) return; // not opened yet: loads on open
+    void fetch(`/api/conversations/${conversationId}/messages`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && useWorkspace.getState().setMessages(conversationId, d.messages));
+  };
+  const channel = supabase
+    .channel(`orbit:${userId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "conversations", filter: `user_id=eq.${userId}` }, soon)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `user_id=eq.${userId}` }, (payload) => {
+      const conversationId = (payload.new as { conversation_id?: string }).conversation_id;
+      if (conversationId) reloadConversation(conversationId);
+      soon();
+    })
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` }, (payload) => {
+      const n = payload.new as { kind: "message" | "priority" | "reminder" | "system"; title: string; body: string; account_id?: string; conversation_id?: string };
+      const { prefs, accounts, conversations } = useWorkspace.getState();
+      const d = decide({ kind: n.kind }, { prefs, account: accounts.find((a) => a.id === n.account_id), conversation: conversations.find((c) => c.id === n.conversation_id) });
+      if (d.deliver && d.interrupt) {
+        toast(n.title, { description: n.body });
+        if (prefs.desktopNotifications) void showDesktopNotification(n.title, n.body, () => n.conversation_id && navigate(`/inbox?c=${n.conversation_id}`));
+      }
+      soon();
+    })
+    .subscribe();
+  return () => {
+    if (pending) clearTimeout(pending);
+    void supabase.removeChannel(channel);
+  };
 }
 
 function mirror(state: WorkspaceState, prev: WorkspaceState, out: Outbox) {

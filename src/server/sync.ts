@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Account, Conversation, Message, PlatformId } from "@/lib/types";
-import { decryptJSON, encryptJSON } from "./crypto";
+import { decryptJSON, encryptJSON, randomToken } from "./crypto";
 import { getConnector } from "./connectors";
 import { normalizeTelegramUpdate, type TgUpdate } from "./connectors/telegram";
 import { AuthError, ConnectorError, RateLimitError, type ConnectorContext, type NormalizedConversation, type NormalizedMessage, type OutboundFile, type TokenSet } from "./connectors/types";
@@ -225,6 +225,17 @@ export async function syncAccount(userId: string, accountId: string, kind: "init
         stats.messages += n;
       }
       if (updates.length) await db.from("connected_accounts").update({ sync_cursor: { ...row.sync_cursor, offset: updates[updates.length - 1].update_id + 1 } }).eq("id", row.id);
+    } else if (connector.incremental) {
+      // History/delta based: only what changed since the stored cursor (full list when there is none).
+      const result = await connector.incremental(ctx, row.sync_cursor ?? {});
+      for (const nc of result.items) {
+        const convId = await upsertConversation(db, row, nc);
+        stats.conversations++;
+        stats.messages += await insertMessages(db, row, convId, nc.messages ?? (await connector.listMessages(ctx, nc.externalId)).items);
+        if (nc.unreadCount === 0) await db.from("conversations").update({ unread_count: 0 }).eq("id", convId).eq("user_id", userId);
+      }
+      row.sync_cursor = { ...(row.sync_cursor ?? {}), ...result.cursor };
+      await db.from("connected_accounts").update({ sync_cursor: row.sync_cursor }).eq("id", row.id).eq("user_id", userId);
     } else {
       const pages = kind === "initial" ? 2 : 1;
       let cursor: string | undefined;
@@ -240,6 +251,7 @@ export async function syncAccount(userId: string, accountId: string, kind: "init
         if (!cursor) break;
       }
     }
+    await ensurePush(db, row, ctx).catch((e) => console.error("[push] subscribe failed", row.platform_id, e));
     await db.from("connected_accounts").update({ status: "connected", status_message: null, last_synced_at: new Date().toISOString() }).eq("id", accountId).eq("user_id", userId);
     await db.from("sync_jobs").update({ status: "succeeded", finished_at: new Date().toISOString(), stats }).eq("id", job?.id);
     return stats;
@@ -260,6 +272,25 @@ export async function syncAccount(userId: string, accountId: string, kind: "init
       await db.from("sync_jobs").update({ status: "failed", finished_at: new Date().toISOString(), error: err.message }).eq("id", job?.id);
     }
     throw e;
+  }
+}
+
+/** Creates or renews provider push notifications when Orbit has a public URL. */
+async function ensurePush(db: SupabaseClient, row: AccountRow, ctx: ConnectorContext) {
+  const connector = getConnector(row.platform_id);
+  const base = process.env.ORBIT_PUBLIC_URL?.replace(/\/$/, "");
+  if (!connector?.subscribe || !base) return;
+  let secret = row.webhook_secret;
+  if (!secret) {
+    secret = randomToken(24);
+    await db.from("connected_accounts").update({ webhook_secret: secret }).eq("id", row.id).eq("user_id", row.user_id);
+    row.webhook_secret = secret;
+  }
+  const existing = (row.sync_cursor?.subscription as Record<string, unknown> | undefined) ?? undefined;
+  const state = await connector.subscribe(ctx, { notificationUrl: `${base}/api/webhooks/${row.platform_id}`, secret, existing });
+  if (state && state !== existing) {
+    row.sync_cursor = { ...(row.sync_cursor ?? {}), subscription: state };
+    await db.from("connected_accounts").update({ sync_cursor: row.sync_cursor }).eq("id", row.id).eq("user_id", row.user_id);
   }
 }
 

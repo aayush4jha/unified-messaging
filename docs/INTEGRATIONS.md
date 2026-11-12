@@ -28,7 +28,8 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 ### Gmail (`src/server/connectors/gmail.ts`)
 - **Scopes:** `gmail.modify` (read, label, archive, mark read), `gmail.send`, `openid email profile`.
 - **Multiple accounts:** each Google account is its own `connected_accounts` row with its own encrypted refresh token, and you pick the sending account per message.
-- **Sync:** `threads.list` → `threads.get` (metadata + plain-text body), then incremental sync via `history.list` from the stored `historyId`. Push via `users.watch` → Pub/Sub is supported, and needs renewing every ≤7 days (handled by the cron job).
+- **Sync:** the first run lists recent threads (`threads.list` → `threads.get`) and records the mailbox `historyId`. Later runs use `history.list` to fetch only touched threads, with a full resync if the id has expired.
+- **Push (optional):** `users.watch` → Cloud Pub/Sub → `/api/webhooks/gmail?token=…`. Renewed daily; Google requires renewal at least every 7 days.
 - **Quota awareness:** after the 2026-05-01 quota change, `threads.get` costs 40 units (120 for full format). The connector requests `format=full` only for threads that are opened, and uses `metadata` for list sync.
 - **Attachments:** downloaded on demand with `messages.attachments.get`. Sending with attachments uses the multipart upload endpoint (up to 35 MB raw; Orbit caps at 25 MB) because the JSON endpoint is limited to 5 MB.
 - **Retention:** Google's policy forbids keeping cached copies longer than permitted. Orbit stores message bodies for the retention window set in Settings → Privacy (default 365 days, minimum 1). Deleting an account deletes all of its data.
@@ -39,7 +40,9 @@ Researched against primary developer documentation on **2026-11-12**. The full f
 - **Replies** use `createReply` + `send`, so Graph returns real message and conversation ids (`sendMail` doesn't), which idempotent sends need. New messages go draft → send.
 - **Read / archive** are mirrored: `isRead` is patched, and archive moves messages between Inbox and the well-known Archive folder.
 - **Disconnect:** Microsoft has no per-app token revocation endpoint. Orbit deletes its stored tokens and data; users can remove the app at account.microsoft.com (or My Apps for work accounts).
-- **Limits:** about 10,000 requests per 10 minutes per mailbox. 429s are retried after `Retry-After`. Change notifications (webhooks) are planned; for now the 5-minute cron catches new mail.
+- **Incremental sync** uses Graph delta queries (Inbox and Sent Items) and stores the `deltaLink`.
+- **Push:** a change-notification subscription on Inbox messages (`/api/webhooks/outlook`), verified by a per-account `clientState`, renewed daily (mail subscriptions last up to 7 days).
+- **Limits:** about 10,000 requests per 10 minutes per mailbox. 429s are retried after `Retry-After`.
 
 ### Slack (`src/server/connectors/slack.ts`)
 - **User-token scopes:** `channels:history groups:history im:history mpim:history channels:read groups:read im:read mpim:read users:read chat:write files:read files:write` (+ the `*:write` conversation scopes for marking read).

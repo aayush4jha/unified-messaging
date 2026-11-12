@@ -358,6 +358,55 @@ export const GmailConnector: Connector = {
     return { externalMessageId: sent.id, externalConversationId: sent.threadId, sentAt: new Date().toISOString() };
   },
 
+  async incremental(ctx, cursor) {
+    const historyId = cursor.historyId as string | undefined;
+    const full = async () => {
+      const profile = await (await gmailFetch(ctx, "/profile", {}, "profile")).json();
+      const page = await GmailConnector.listConversations(ctx);
+      return { items: page.items, cursor: { ...cursor, historyId: String(profile.historyId) } };
+    };
+    if (!historyId) return full();
+
+    const tokens = await ensureFresh(ctx);
+    const threadIds = new Set<string>();
+    let latest = historyId;
+    let pageToken: string | undefined;
+    do {
+      const p = new URLSearchParams({ startHistoryId: historyId, maxResults: "100" });
+      for (const t of ["messageAdded", "labelAdded", "labelRemoved"]) p.append("historyTypes", t);
+      if (pageToken) p.set("pageToken", pageToken);
+      const res = await providerFetch(`${API}/history?${p}`, { label: "history.list", headers: { authorization: `Bearer ${tokens.accessToken}` } });
+      // 404: the historyId is too old (Google keeps roughly a week). Resync from scratch.
+      if (res.status === 404) return full();
+      if (!res.ok) throw new ConnectorError(`Gmail history.list failed (${res.status})`, res.status >= 500);
+      const d = await res.json();
+      latest = String(d.historyId ?? latest);
+      for (const h of (d.history ?? []) as { messagesAdded?: { message: { threadId: string } }[]; labelsAdded?: { message: { threadId: string } }[]; labelsRemoved?: { message: { threadId: string } }[] }[]) {
+        for (const x of [...(h.messagesAdded ?? []), ...(h.labelsAdded ?? []), ...(h.labelsRemoved ?? [])]) threadIds.add(x.message.threadId);
+      }
+      pageToken = d.nextPageToken;
+    } while (pageToken);
+
+    const items: NormalizedConversation[] = [];
+    for (const id of [...threadIds].slice(0, 100)) {
+      const res = await providerFetch(`${API}/threads/${id}?format=full`, { label: "threads.get", headers: { authorization: `Bearer ${tokens.accessToken}` } });
+      if (res.status === 404) continue; // deleted / moved to trash
+      if (!res.ok) throw new ConnectorError(`Gmail threads.get failed (${res.status})`, res.status >= 500);
+      items.push(normalizeGmailThread(await res.json(), ctx.accountHandle));
+    }
+    return { items, cursor: { ...cursor, historyId: latest } };
+  },
+
+  /** Gmail push: users.watch publishes to a Cloud Pub/Sub topic whose push subscription targets /api/webhooks/gmail. */
+  async subscribe(ctx, opts) {
+    const topic = process.env.GOOGLE_PUBSUB_TOPIC;
+    if (!topic) return null;
+    const expiresAt = Number((opts.existing as { expiresAt?: number } | undefined)?.expiresAt ?? 0);
+    if (expiresAt - Date.now() > 24 * 3_600_000) return opts.existing ?? null; // renew daily, as Google recommends
+    const r = await (await gmailFetch(ctx, "/watch", { method: "POST", body: JSON.stringify({ topicName: topic, labelIds: ["INBOX", "SENT"], labelFilterBehavior: "include" }) }, "watch")).json();
+    return { kind: "gmail-watch", expiresAt: Number(r.expiration), historyId: String(r.historyId) };
+  },
+
   async downloadAttachment(ctx, messageId, att) {
     if (!att.externalId) throw new ConnectorError("This attachment can't be downloaded.", false);
     const r = await (await gmailFetch(ctx, `/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.externalId)}`, {}, "attachments.get")).json();
