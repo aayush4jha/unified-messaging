@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Dialog as D } from "radix-ui";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useDeferredValue, useMemo } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { PLATFORMS } from "@/lib/platforms";
 import { inboxHref } from "@/lib/routes";
 import { highlightParts, parseQuery, runSearch } from "@/lib/search";
@@ -79,6 +79,7 @@ function Palette() {
   const setPrefs = useWorkspace((s) => s.setPrefs);
   const openConversationId = params.get("c");
 
+  const [picked, setPicked] = useState<{ query: string; value: string } | null>(null);
   const close = () => setPalette(false);
   const go = (href: string) => {
     close();
@@ -124,8 +125,18 @@ function Palette() {
   const recent = !q ? [...conversations].filter((c) => !c.archived).sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)).slice(0, 5) : [];
   const current = openConversationId ? conversations.find((c) => c.id === openConversationId) : undefined;
 
+  const firstValue = hits[0] ? `msg-${hits[0].conversation.id}` : q ? "search-all" : current ? "conv-archive" : recent[0] ? `recent-${recent[0].id}` : (matchedActions[0]?.id ?? "");
+  const selectedValue = picked && picked.query === deferred ? picked.value : firstValue;
+
   return (
-    <Command shouldFilter={false} loop label="Command palette" className="flex max-h-[min(560px,75vh)] flex-col">
+    <Command
+      shouldFilter={false}
+      loop
+      label="Command palette"
+      className="flex max-h-[min(560px,75vh)] flex-col"
+      value={selectedValue}
+      onValueChange={(v) => setPicked({ query: deferred, value: v })}
+    >
       <div className="flex items-center gap-3 border-b border-line-subtle px-4">
         <Search className="size-4 shrink-0 text-fg-3" />
         <Command.Input
@@ -157,13 +168,13 @@ function Palette() {
 
         {current && !q ? (
           <Command.Group heading="This conversation">
-            <Item onSelect={() => (useWorkspace.getState().setArchived([current.id], !current.archived), close())} icon={<Archive />} shortcut="E">
+            <Item value="conv-archive" onSelect={() => (useWorkspace.getState().setArchived([current.id], !current.archived), close())} icon={<Archive />} shortcut="E">
               {current.archived ? "Move to inbox" : "Archive"}
             </Item>
-            <Item onSelect={() => (useWorkspace.getState().toggleStar(current.id), close())} icon={<Star />} shortcut="S">
+            <Item value="conv-star" onSelect={() => (useWorkspace.getState().toggleStar(current.id), close())} icon={<Star />} shortcut="S">
               {current.starred ? "Unstar" : "Star"}
             </Item>
-            <Item onSelect={() => (useUI.getState().focusComposer(), close())} icon={<PenSquare />} shortcut="R">
+            <Item value="conv-reply" onSelect={() => (useUI.getState().focusComposer(), close())} icon={<PenSquare />} shortcut="R">
               Reply
             </Item>
           </Command.Group>
@@ -204,13 +215,13 @@ function Palette() {
                 </div>
               </Command.Item>
             ))}
-            <Item onSelect={() => go(`/search?q=${encodeURIComponent(query)}`)} icon={<Search />} shortcut="↵">
+            <Item value="search-all-more" onSelect={() => go(`/search?q=${encodeURIComponent(query)}`)} icon={<Search />}>
               See all results for “{query.trim()}”
             </Item>
           </Command.Group>
         ) : q ? (
           <Command.Group heading="Messages">
-            <Item onSelect={() => go(`/search?q=${encodeURIComponent(query)}`)} icon={<Search />}>
+            <Item value="search-all" onSelect={() => go(`/search?q=${encodeURIComponent(query)}`)} icon={<Search />}>
               Search all messages for “{query.trim()}”
             </Item>
           </Command.Group>
@@ -248,7 +259,7 @@ function Palette() {
         {matchedAccounts.length > 0 ? (
           <Command.Group heading="Accounts">
             {matchedAccounts.map((a) => (
-              <Item key={a.id} onSelect={() => go(inboxHref({ account: a.id }))} icon={<PlatformIcon platform={a.platform} size={16} />}>
+              <Item key={a.id} value={`account-${a.id}`} onSelect={() => go(inboxHref({ account: a.id }))} icon={<PlatformIcon platform={a.platform} size={16} />}>
                 {PLATFORMS[a.platform].name} · {a.label} <span className="ml-1 text-fg-4">{a.handle}</span>
               </Item>
             ))}
@@ -258,7 +269,7 @@ function Palette() {
         {matchedActions.length > 0 ? (
           <Command.Group heading={q ? "Commands" : "Quick actions"}>
             {matchedActions.map((a) => (
-              <Item key={a.id} onSelect={a.run} icon={a.icon} shortcut={a.shortcut}>
+              <Item key={a.id} value={a.id} onSelect={a.run} icon={a.icon} shortcut={a.shortcut}>
                 {a.label}
               </Item>
             ))}
@@ -281,9 +292,10 @@ function Palette() {
   );
 }
 
-function Item({ children, icon, shortcut, onSelect }: { children: React.ReactNode; icon: React.ReactNode; shortcut?: string; onSelect: () => void }) {
+function Item({ children, icon, shortcut, onSelect, value }: { children: React.ReactNode; icon: React.ReactNode; shortcut?: string; onSelect: () => void; value: string }) {
   return (
     <Command.Item
+      value={value}
       onSelect={onSelect}
       className="flex h-9 cursor-default items-center gap-3 rounded-md px-2.5 text-[0.8125rem] text-fg-2 data-[selected=true]:bg-hover data-[selected=true]:text-fg [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-fg-3"
     >

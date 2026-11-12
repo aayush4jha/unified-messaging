@@ -6,8 +6,11 @@ import { BRAND_PATHS } from "./brand-paths";
 /**
  * Platform mark: a small rounded tile in the provider's brand color with a
  * white glyph. Used sparingly — it's the only place brand colors appear.
+ *
+ * Decorative by default (hidden from assistive tech) because it's almost always
+ * next to visible text. Pass `label` when the icon is the only indication of the platform.
  */
-export function PlatformIcon({ platform, size = 16, className, mono }: { platform: PlatformId; size?: number; className?: string; mono?: boolean }) {
+export function PlatformIcon({ platform, size = 16, className, mono, label }: { platform: PlatformId; size?: number; className?: string; mono?: boolean; label?: boolean }) {
   const info = PLATFORMS[platform];
   return (
     <span
@@ -20,8 +23,7 @@ export function PlatformIcon({ platform, size = 16, className, mono }: { platfor
         color: mono ? "var(--text-2)" : "#fff",
       }}
       title={info.name}
-      aria-label={info.name}
-      role="img"
+      {...(label ? { role: "img", "aria-label": info.name } : { "aria-hidden": true })}
     >
       <svg viewBox="0 0 24 24" width={Math.round(size * 0.62)} height={Math.round(size * 0.62)} fill="currentColor" aria-hidden>
         <Glyph platform={platform} />

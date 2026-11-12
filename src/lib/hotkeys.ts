@@ -48,7 +48,7 @@ export function useHotkeys(map: HotkeyMap, enabled = true) {
       const isMod = combo.startsWith("mod+");
       if (typing && !isMod && combo !== "escape") return;
       // Don't hijack shortcuts while a dialog/menu (other than our own targets) owns focus
-      const inDialog = e.target instanceof HTMLElement && !!e.target.closest("[role=dialog],[role=menu],[role=listbox]");
+      const inDialog = e.target instanceof HTMLElement && !!e.target.closest("[role=dialog],[role=alertdialog],[role=menu]");
       if (inDialog && !isMod) return;
 
       const handlers = mapRef.current;

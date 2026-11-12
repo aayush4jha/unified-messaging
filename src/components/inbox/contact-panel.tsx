@@ -107,7 +107,7 @@ export function ContactPanel({ conversation: c, className, onClose }: { conversa
         <Section title="Reach them on">
           <div className="space-y-1">
             {contact.handles.map((h) => (
-              <CopyRow key={`${h.platform}:${h.value}`} icon={<PlatformIcon platform={h.platform} size={14} />} value={h.value} />
+              <CopyRow key={`${h.platform}:${h.value}`} icon={<PlatformIcon platform={h.platform} size={14} label />} value={h.value} />
             ))}
             {contact.phones
               .filter((ph) => !contact.handles.some((h) => h.value === ph))
