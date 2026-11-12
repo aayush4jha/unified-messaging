@@ -651,8 +651,8 @@ SM`,
     messages: [
       { from: "c_jordan", ago: 3 * D + 6 * H, body: "ok lisbon is officially happening 🇵🇹" },
       { from: "c_jordan", ago: 3 * D + 6 * H - 30_000, body: "here's the itinerary draft, flights are in there too", attachments: [file("Lisbon-itinerary-v2.pdf", "application/pdf", 612_000)] },
-      { from: "me", ago: 3 * D + 5 * H, body: "LET'S GO. Looks great — can we swap day 3 and 4 so Sintra isn't on a Monday?" },
-      { from: "c_jordan", ago: 3 * D + 4 * H, body: "good call, updating it" },
+      { from: "me", ago: 3 * D + 6 * H - 18 * MIN, body: "LET'S GO. Looks great — can we swap day 3 and 4 so Sintra isn't on a Monday?" },
+      { from: "c_jordan", ago: 3 * D + 5 * H + 40 * MIN, body: "good call, updating it" },
       { from: "c_jordan", ago: 7 * H, body: "flights go up $60 on friday btw, should we just book tonight?" },
     ],
   });
@@ -718,7 +718,7 @@ SM`,
     unread: 1,
     messages: [
       { from: "c_marco", ago: 1 * D + 6 * H, body: "Hello, I bought the Northwind icon set but the download link expired. Order #4417." },
-      { from: "me", ago: 1 * D + 5 * H, body: "Hi Marco, sorry about that! I've reissued the link. It's valid for 7 days." },
+      { from: "me", ago: 1 * D + 5 * H + 35 * MIN, body: "Hi Marco, sorry about that! I've reissued the link. It's valid for 7 days." },
       { from: "c_marco", ago: 35 * MIN, body: "Got it, thank you. Is there a Figma version of the set too?" },
     ],
   });
@@ -797,7 +797,7 @@ SM`,
     externalUrl: "https://www.instagram.com/direct/inbox/",
     messages: [
       { from: "c_jordan", ago: 1 * D + 9 * H, body: "Shared a reel: “10 hidden spots in Lisbon”" },
-      { from: "me", ago: 1 * D + 8 * H, body: "adding #4 to the list immediately" },
+      { from: "me", ago: 1 * D + 6 * H + 20 * MIN, body: "adding #4 to the list immediately" },
     ],
   });
 
@@ -840,8 +840,8 @@ SM`,
     starred: true,
     messages: [
       { from: "c_priya", ago: 1 * D + 4 * H, body: "Do you have 10 min tomorrow to sync on Halcyon scope? Daniel's refill question is going to come up Friday." },
-      { from: "me", ago: 1 * D + 3 * H, body: "Yes — 11:30?" },
-      { from: "c_priya", ago: 1 * D + 3 * H - 120_000, body: "Perfect 👍" },
+      { from: "me", ago: 1 * D + 3 * H + 50 * MIN, body: "Yes — 11:30?" },
+      { from: "c_priya", ago: 1 * D + 3 * H + 47 * MIN, body: "Perfect 👍" },
     ],
   });
 

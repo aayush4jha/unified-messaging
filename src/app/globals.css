@@ -66,6 +66,17 @@
   --shadow-lg: 0 16px 40px -8px oklch(0.2 0.01 80 / 0.18), 0 0 0 1px oklch(0.2 0.01 80 / 0.06);
   --shadow-xl: 0 28px 70px -12px oklch(0.2 0.01 80 / 0.28), 0 0 0 1px oklch(0.2 0.01 80 / 0.06);
 
+  /* Data viz (validated reference palette: categorical slots 1-2, blue sequential ramp) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --seq-0: #f1f0ec;
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #256abf;
+  --seq-6: #184f95;
+
   /* Density (overridden by [data-density]) */
   --row-py: 0.625rem;
   --nav-h: 1.875rem;
@@ -120,6 +131,16 @@
   --info-soft: oklch(0.7 0.1 240 / 0.14);
 
   --bubble-in: oklch(0.235 0.004 75);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --seq-0: #262524;
+  --seq-1: #0d366b;
+  --seq-2: #104281;
+  --seq-3: #184f95;
+  --seq-4: #256abf;
+  --seq-5: #3987e5;
+  --seq-6: #6da7ec;
 
   --shadow-xs: 0 1px 0 oklch(0 0 0 / 0.2);
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3), 0 0 0 1px oklch(1 0 0 / 0.04);

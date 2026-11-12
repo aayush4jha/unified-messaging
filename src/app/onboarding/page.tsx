@@ -1,27 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { OrbitLogo } from "@/components/brand/platform-icon";
-import { Button } from "@/components/ui/button";
+import { OrbitMark } from "@/components/brand/platform-icon";
+import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { useWorkspace } from "@/store/workspace";
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const loadDemo = useWorkspace((s) => s.loadDemo);
-  const setPrefs = useWorkspace((s) => s.setPrefs);
-  return (
-    <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-bg">
-      <OrbitLogo />
-      <Button
-        variant="primary"
-        onClick={() => {
-          loadDemo();
-          setPrefs({ onboarded: true });
-          router.replace("/inbox");
-        }}
-      >
-        Explore the sample workspace
-      </Button>
-    </div>
-  );
+  const hydrated = useWorkspace((s) => s.hydrated);
+  if (!hydrated)
+    return (
+      <div className="flex h-dvh items-center justify-center bg-bg">
+        <OrbitMark size={32} className="animate-pulse-dot" />
+      </div>
+    );
+  return <OnboardingFlow />;
 }
